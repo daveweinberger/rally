@@ -14,6 +14,7 @@ CRITICAL RULES:
    - If constraints are relaxed, explicitly list which ones and why in the "relaxedConstraints" field of each activity.
 4. GROUNDING AND DATA:
    - Use Google Maps Grounding to verify trailhead coordinates, place names, and IDs.
+   - TRAILHEAD DIRECTIONS: When using Google Maps Grounding to retrieve names, placeIds, and coordinates for outdoor activities, you MUST specifically target the TRAILHEAD (e.g., "Storm King Trailhead", "Snow Lake Trailhead", "Mailbox Peak Trailhead") rather than the trail body itself, a peak, or a lake center. Ensure coordinates and placeIds represent the vehicle-accessible parking lot or entrance where the hike or activity begins. The returned "name" of the activity should also reflect the trailhead (e.g., "Storm King Trailhead").
    - To make recentTips as useful and fresh as possible, you must search Google for the latest trip reports, trail conditions, or seasonal updates. To minimize latency, you MUST perform AT MOST 1 single search query in total (e.g., search for regional trip reports like "Snoqualmie Pass WTA trail reports June 2026"). Do NOT perform individual search queries for each trailhead, town, or trail. Rely on your pre-trained knowledge for specific trail facts and characteristics. Do NOT search Google for weather conditions.
    - STRICT RECENCY: For the "recentTips" field, you MUST ONLY include highly recent condition reports or tips from the current month/year (i.e. June 2026). Absolutely NEVER recommend or list tips, reports, or articles from previous years (e.g. 2022, 2023, 2024, 2025). If no recent reports from the current month/year are found in the search results, you must rely on typical seasonal patterns for the current month and label the date as "Seasonal average" or "General guidance", rather than using an outdated specific date from a past year.
    - You will be provided with the live starting location weather forecast directly in the prompt constraints.
@@ -31,11 +32,11 @@ export const RESPONSE_SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
-          name: { type: "STRING", description: "Name of the trail, peak, or location (e.g. 'Snow Lake Trail')" },
+          name: { type: "STRING", description: "Name of the trailhead or starting point (e.g. 'Snow Lake Trailhead')" },
           location: { type: "STRING", description: "General region or town (e.g. 'Snoqualmie Pass, WA')" },
-          placeId: { type: "STRING", description: "The Google Maps placeId of the location if retrieved via Maps Grounding" },
-          latitude: { type: "NUMBER", description: "Latitude of the trailhead or location" },
-          longitude: { type: "NUMBER", description: "Longitude of the trailhead or location" },
+          placeId: { type: "STRING", description: "The Google Maps placeId of the trailhead or starting point parking lot if retrieved via Maps Grounding" },
+          latitude: { type: "NUMBER", description: "Latitude of the trailhead parking lot / starting point where cars can park" },
+          longitude: { type: "NUMBER", description: "Longitude of the trailhead parking lot / starting point where cars can park" },
           matchReason: { type: "STRING", description: "A concise, natural-language paragraph (2-3 sentences) explaining why this activity fits the user's constraints and current conditions. Do not use markdown bullet points or bold text." },
           difficulty: { type: "STRING", description: "Beginner, Intermediate, Advanced, or Expert" },
           recentTips: {
