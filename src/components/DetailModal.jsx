@@ -2,6 +2,36 @@ import { useEffect } from 'react';
 import { X, MapPin, AlertTriangle, Route, ExternalLink } from 'lucide-react';
 import Attribution from './Attribution.jsx';
 
+const cleanPlaceId = (id) => id ? id.replace(/^places\//, '') : '';
+
+function isAttributionMatch(activityName, activityPlaceId, chunkMaps) {
+  if (!chunkMaps) return false;
+  
+  // 1. Precise Match by Google Maps placeId
+  const aPlaceId = cleanPlaceId(activityPlaceId);
+  const cPlaceId = cleanPlaceId(chunkMaps.placeId);
+  if (aPlaceId && cPlaceId && aPlaceId === cPlaceId) {
+    return true;
+  }
+  
+  // 2. Fallback Looser Title Comparison (handling suffixes and parentheticals)
+  const aName = activityName || '';
+  const cName = chunkMaps.title || '';
+  
+  const clean = (s) => s.toLowerCase()
+    .replace(/\([^)]*\)/g, '') // remove parentheticals
+    .replace(/[^a-z0-9\s]/g, '') // remove punctuation
+    .replace(/\b(trail|trailhead|parking|hike|loop|highway|route)\b/g, '') // remove trailing search suffixes
+    .replace(/\s+/g, ' ') // normalize spaces
+    .trim();
+    
+  const cleanA = clean(aName);
+  const cleanC = clean(cName);
+  
+  if (!cleanA || !cleanC) return false;
+  return cleanA.includes(cleanC) || cleanC.includes(cleanA);
+}
+
 export default function DetailModal({ activity, onClose, generalAttribution, constraints }) {
   const origin = constraints?.startCoords
     ? `${constraints.startCoords.latitude},${constraints.startCoords.longitude}`
@@ -234,8 +264,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
               groundingMetadata={{
                 groundingChunks: generalAttribution.groundingChunks?.filter(chunk => {
                   if (chunk.maps) {
-                    return chunk.maps.title?.toLowerCase().includes(activity.name.toLowerCase()) || 
-                           activity.name.toLowerCase().includes(chunk.maps.title?.toLowerCase());
+                    return isAttributionMatch(activity.name, activity.placeId, chunk.maps);
                   }
                   return false;
                 }) || [],
