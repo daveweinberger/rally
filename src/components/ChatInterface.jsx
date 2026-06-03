@@ -162,7 +162,7 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
                   {/* Citations immediately below model bubble */}
                   {!isUser && msg.groundingMetadata && (
                     <div style={{ width: '100%' }}>
-                      <Attribution groundingMetadata={msg.groundingMetadata} />
+                      <Attribution groundingMetadata={msg.groundingMetadata} isChat={true} />
                     </div>
                   )}
                 </div>

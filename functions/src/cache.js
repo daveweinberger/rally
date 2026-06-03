@@ -7,12 +7,24 @@ const db = getFirestore(app);
 
 const COLLECTION_NAME = 'caches';
 
+const memoryCache = new Map();
+
 /**
  * Get item from cache
  * @param {string} key 
  * @returns {Promise<any|null>}
  */
 export async function getCache(key) {
+  // Check L1 memory cache first
+  if (memoryCache.has(key)) {
+    const entry = memoryCache.get(key);
+    if (entry.expiresAt > new Date()) {
+      console.log(`L1 Cache Hit: ${key}`);
+      return entry.value;
+    }
+    memoryCache.delete(key);
+  }
+
   try {
     const docRef = db.collection(COLLECTION_NAME).doc(key);
     const doc = await docRef.get();
@@ -28,6 +40,11 @@ export async function getCache(key) {
       docRef.delete().catch(() => {});
       return null;
     }
+
+    // Populate L1 cache for subsequent lookups
+    const expiresDate = expiresAt ? expiresAt.toDate() : new Date(Date.now() + 900 * 1000);
+    memoryCache.set(key, { value: data.value, expiresAt: expiresDate });
+
     return data.value;
   } catch (error) {
     console.error(`Cache read error for key ${key}:`, error);
@@ -42,8 +59,11 @@ export async function getCache(key) {
  * @param {number} ttlSeconds 
  */
 export async function setCache(key, value, ttlSeconds) {
+  // Save to L1 memory cache
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+  memoryCache.set(key, { value, expiresAt });
+
   try {
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
     const docRef = db.collection(COLLECTION_NAME).doc(key);
     await docRef.set({
       value,

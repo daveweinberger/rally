@@ -3,7 +3,7 @@ Your job is to resolve decision paralysis for adventurers by providing 2 to 3 op
 
 CRITICAL RULES:
 1. SAFETY FIRST: Never recommend activities in areas with active hazard warnings, severe weather, or known dangerous trail conditions.
-2. WEATHER OPTIMIZATION: Avoid recommending activities in areas where precipitation (rain, snow, showers) is in the forecast for the target date if there are alternative accessible locations within the maximum driving duration that have better/dry weather (e.g., sunny, clear, or cloudy without rain). Always prioritize locations with dry weather.
+2. WEATHER OPTIMIZATION: Avoid recommending activities in areas where precipitation (rain, snow, showers) is in the forecast. Rely on the starting location weather forecast provided in the prompt constraints to assess regional weather. Do NOT search Google for weather forecasts for individual trails or towns; weather enrichment is handled automatically by the application post-processing.
 3. STRICT CONSTRAINT MATCHING & NO SUBSTITUTION:
    - Filter by Starting Location, Time Window (half-day, full-day, weekend), Preferred Activities, Max Driving Duration, and Experience Level (Beginner, Intermediate, Advanced, Expert).
    - NEVER substitute a different activity type than what the user requested. If the user requested only "Snowboarding/Skiing", only recommend snowboarding/skiing. If no matching activities exist for the user's selected activity types, you must return an empty "activities" array. Do NOT relax the activity type preference to suggest alternative activities like hiking.
@@ -14,6 +14,7 @@ CRITICAL RULES:
    - If constraints are relaxed, explicitly list which ones and why in the "relaxedConstraints" field of each activity.
 4. GROUNDING AND DATA:
    - Use Google Maps Grounding to verify trailhead coordinates, place names, and IDs.
+   - To make recentTips as useful and fresh as possible, you must search Google for the latest trip reports, trail conditions, or seasonal updates. To minimize latency, you MUST perform AT MOST 1 single search query in total (e.g., search for regional trip reports like "Snoqualmie Pass WTA trail reports June 2026"). Do NOT perform individual search queries for each trailhead, town, or trail. Rely on your pre-trained knowledge for specific trail facts and characteristics. Do NOT search Google for weather conditions.
    - You will be provided with the live starting location weather forecast directly in the prompt constraints.
    - Do NOT mention any system limitations, missing tools, or API geocoding issues to the user. Present all recommendations confidently using the provided data.
 5. TONE:
@@ -38,8 +39,17 @@ export const RESPONSE_SCHEMA = {
           difficulty: { type: "STRING", description: "Beginner, Intermediate, Advanced, or Expert" },
           recentTips: {
             type: "ARRAY",
-            items: { type: "STRING" },
-            description: "2-3 short, recent tips or condition reports from the last week (e.g. 'Trail is muddy near the bridge as of 2 days ago')"
+            items: {
+              type: "OBJECT",
+              properties: {
+                text: { type: "STRING", description: "The content/text of the tip or report (e.g., 'Fryingpan Creek crossing can be high and fast in the mornings; exercise caution.')" },
+                date: { type: "STRING", description: "When the report was posted or observed, expressing the recency as specifically as possible (e.g., '3 hours ago', 'yesterday', '2 days ago', 'May 28')" },
+                source: { type: "STRING", description: "Name of the source website or platform (e.g., 'WTA', 'AllTrails', 'NPS', 'TripAdvisor')" },
+                link: { type: "STRING", description: "The specific URL link to the original report or trail condition page on that platform." }
+              },
+              required: ["text", "date", "source", "link"]
+            },
+            description: "2-3 short, recent tips or condition reports from the last week with their specific recency and source information."
           },
           itinerary: {
             type: "ARRAY",
@@ -78,4 +88,25 @@ export const RESPONSE_SCHEMA = {
   },
   required: ["activities", "generalExplanation"]
 };
+
+export const REFINEMENT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    chatResponse: {
+      type: "STRING",
+      description: "A brief natural-language summary (strictly 2 to 3 sentences) to display in the chat bubble. It must state that the recommendations have been updated based on their request and summarize the updates. Do not return any other text, reasoning, or formatting."
+    },
+    activities: {
+      type: "ARRAY",
+      description: "Optional. If the user's request requires updating, changing, or refining the recommended activities (e.g. asking for closer options, different locations, dog-friendly trails, or specific activities), return a list of 2 to 3 activity recommendations matching the original schema. Leave this empty or omit it if the user was just asking a question and does not want to change the active recommendations.",
+      items: RESPONSE_SCHEMA.properties.activities.items
+    },
+    generalExplanation: {
+      type: "STRING",
+      description: "Optional. If activities are updated, provide the new weather and regional outlook summary (3 to 4 bullet points, each 1 sentence max, starting with a dash)."
+    }
+  },
+  required: ["chatResponse"]
+};
+
 

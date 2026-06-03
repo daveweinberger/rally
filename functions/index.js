@@ -13,7 +13,7 @@ if (getApps().length === 0) {
  * Main adventure search function.
  * Streams status updates and then the final enriched activities.
  */
-export const searchAdventures = onCall({ region: 'us-central1' }, async (request) => {
+export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request) => {
   const constraints = request.data;
   const acceptsStreaming = request.acceptsStreaming;
 
@@ -53,12 +53,7 @@ export const searchAdventures = onCall({ region: 'us-central1' }, async (request
     // Stage 3: Routing & Weather Calculations
     sendStatus('routing', 'Calculating optimal driving times, routes, and trailhead weather forecasts...');
     
-    const enrichedActivities = [];
-    for (let i = 0; i < activities.length; i++) {
-      const activity = activities[i];
-      sendStatus('routing', `Calculating route & weather for: ${activity.name}...`);
-      
-      // Calculate travel time from origin to trailhead/place (use coordinates if available, with robust text fallback)
+    const enrichedPromises = activities.map(async (activity) => {
       const origin = constraints.startCoords || constraints.startLocation;
       let routeData;
       
@@ -122,8 +117,10 @@ export const searchAdventures = onCall({ region: 'us-central1' }, async (request
         }
       }
 
-      enrichedActivities.push(enrichedActivity);
-    }
+      return enrichedActivity;
+    });
+
+    const enrichedActivities = await Promise.all(enrichedPromises);
 
     // Sort and prioritize trails with dry weather over rainy ones
     const dryActivities = [];
@@ -166,47 +163,87 @@ export const searchAdventures = onCall({ region: 'us-central1' }, async (request
  * Refinement Chat function.
  * Streams natural language response character-by-character from Gemini.
  */
-export const refineAdventure = onCall({ region: 'us-central1' }, async (request) => {
-  const { history, message } = request.data;
-  const acceptsStreaming = request.acceptsStreaming;
+export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request) => {
+  const { history, message, constraints } = request.data;
 
   console.log("Starting refineAdventure chat refinement. Message:", message);
 
-  if (acceptsStreaming && request.response && typeof request.response.sendChunk === 'function') {
-    try {
-      let accumulatedText = "";
-      const streamResult = await getRefinementStream(history, message, (chunk) => {
-        accumulatedText += chunk;
-        request.response.sendChunk({ chunk });
+  try {
+    const streamResult = await getRefinementStream(history, message);
+    
+    let enrichedActivities = [];
+    if (streamResult.activities && streamResult.activities.length > 0) {
+      const origin = constraints?.startCoords || constraints?.startLocation || 'Seattle, WA';
+      const targetDay = constraints?.targetDay || 'Today';
+
+      const enrichedPromises = streamResult.activities.map(async (activity) => {
+        let routeData;
+        const weatherPromise = activity.latitude && activity.longitude 
+          ? fetchWeather(activity.latitude, activity.longitude, targetDay)
+          : Promise.resolve(null);
+          
+        if (activity.latitude && activity.longitude) {
+          const coordsDest = {
+            latitude: activity.latitude,
+            longitude: activity.longitude
+          };
+          const firstAttempt = await computeRoute(origin, coordsDest);
+          
+          if (firstAttempt.durationText && firstAttempt.durationText.includes('fallback')) {
+            console.log(`Routes API (Refinement): Coordinate-based routing failed for ${activity.name}. Retrying with name+location.`);
+            const secondAttempt = await computeRoute(origin, `${activity.name}, ${activity.location}`);
+            if (secondAttempt.durationText && secondAttempt.durationText.includes('fallback')) {
+              routeData = await computeRoute(origin, activity.name);
+            } else {
+              routeData = secondAttempt;
+            }
+          } else {
+            routeData = firstAttempt;
+          }
+        } else {
+          const textDest = activity.placeId || `${activity.name}, ${activity.location}`;
+          const attempt = await computeRoute(origin, textDest);
+          if (attempt.durationText && attempt.durationText.includes('fallback') && activity.name) {
+            routeData = await computeRoute(origin, activity.name);
+          } else {
+            routeData = attempt;
+          }
+        }
+        
+        const weatherData = await weatherPromise;
+        
+        const enrichedActivity = {
+          ...activity,
+          driveTime: routeData.durationText,
+          driveTimeSeconds: routeData.durationSeconds,
+          distance: routeData.distanceText,
+          distanceMeters: routeData.distanceMeters,
+          weather: weatherData
+        };
+
+        if (weatherData && weatherData.rainProbability > 30) {
+          if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
+          const weatherWarn = `Weather forecast predicts a ${weatherData.rainProbability}% chance of rain (${weatherData.condition}) with temperature highs near ${Math.round(weatherData.maxTemp)}°F.`;
+          if (!enrichedActivity.warnings.includes(weatherWarn)) {
+            enrichedActivity.warnings.unshift(weatherWarn);
+          }
+        }
+
+        return enrichedActivity;
       });
 
-      // Send the final result with grounding metadata
-      request.response.sendChunk({
-        done: true,
-        text: streamResult.text,
-        groundingMetadata: streamResult.groundingMetadata
-      });
-      
-      return null;
-    } catch (error) {
-      console.error("Error in streaming refineAdventure:", error);
-      request.response.sendChunk({ error: error.message });
-      throw error;
+      enrichedActivities = await Promise.all(enrichedPromises);
     }
-  } else {
-    // Non-streaming fallback
-    try {
-      const chunks = [];
-      const streamResult = await getRefinementStream(history, message, (chunk) => {
-        chunks.push(chunk);
-      });
-      return {
-        text: streamResult.text,
-        groundingMetadata: streamResult.groundingMetadata
-      };
-    } catch (error) {
-      console.error("Error in non-streaming refineAdventure:", error);
-      throw error;
-    }
+
+    return {
+      text: streamResult.chatResponse,
+      results: enrichedActivities,
+      generalExplanation: streamResult.generalExplanation,
+      groundingMetadata: streamResult.groundingMetadata
+    };
+
+  } catch (error) {
+    console.error("Error in refineAdventure Cloud Function:", error);
+    throw error;
   }
 });

@@ -13,8 +13,18 @@ const SEATTLE_MOCK = {
       driveTime: "52 mins",
       distance: "31.1 mi",
       recentTips: [
-        "Trail is muddy past mile 2, but snow is fully melted as of 2 days ago.",
-        "Parking lot is full by 8:30 AM on sunny Saturdays. Get there early!"
+        {
+          text: "Trail is muddy past mile 2, but snow is fully melted.",
+          date: "2 days ago",
+          source: "WTA",
+          link: "https://www.wta.org/go-hiking/hikes/snow-lake-1"
+        },
+        {
+          text: "Parking lot is full by 8:30 AM on sunny Saturdays. Get there early!",
+          date: "3 days ago",
+          source: "AllTrails",
+          link: "https://www.alltrails.com/trail/us/washington/snow-lake-trail"
+        }
       ],
       itinerary: [
         { time: "07:00", action: "Depart Seattle (I-90 E)" },
@@ -41,8 +51,18 @@ const SEATTLE_MOCK = {
       driveTime: "45 mins",
       distance: "28.5 mi",
       recentTips: [
-        "Trail is dry and in excellent condition. Expect crowds after 10 AM.",
-        "Porta-potties at the trailhead are open and clean."
+        {
+          text: "Trail is dry and in excellent condition. Expect crowds after 10 AM.",
+          date: "4 hours ago",
+          source: "WTA",
+          link: "https://www.wta.org/go-hiking/hikes/rattlesnake-ledge"
+        },
+        {
+          text: "Porta-potties at the trailhead are open and clean.",
+          date: "yesterday",
+          source: "AllTrails",
+          link: "https://www.alltrails.com/trail/us/washington/rattlesnake-mountain-trail--2"
+        }
       ],
       itinerary: [
         { time: "08:30", action: "Depart Seattle" },
@@ -98,8 +118,18 @@ const GENERIC_MOCK = (location) => {
         driveTime: "40 mins",
         distance: "22 mi",
         recentTips: [
-          "Trail conditions are good. Wildflowers are blooming.",
-          "No active closures reported in the area."
+          {
+            text: "Trail conditions are good. Wildflowers are blooming.",
+            date: "10 hours ago",
+            source: "WTA",
+            link: "https://www.wta.org"
+          },
+          {
+            text: "No active closures reported in the area.",
+            date: "3 days ago",
+            source: "AllTrails",
+            link: "https://www.alltrails.com"
+          }
         ],
         itinerary: [
           { time: "08:00", action: `Depart starting point` },
@@ -125,8 +155,18 @@ const GENERIC_MOCK = (location) => {
         driveTime: "30 mins",
         distance: "15 mi",
         recentTips: [
-          "Perfect for a relaxed day. Dog friendly.",
-          "Shaded forest trail keeps it cool in hot weather."
+          {
+            text: "Perfect for a relaxed day. Dog friendly.",
+            date: "yesterday",
+            source: "AllTrails",
+            link: "https://www.alltrails.com"
+          },
+          {
+            text: "Shaded forest trail keeps it cool in hot weather.",
+            date: "5 days ago",
+            source: "WTA",
+            link: "https://www.wta.org"
+          }
         ],
         itinerary: [
           { time: "09:00", action: `Depart starting point` },
@@ -189,6 +229,37 @@ export async function simulateMockRefinementStream(onChunk) {
   
   return {
     text: mockResponseText,
+    results: [
+      {
+        name: "Franklin Falls",
+        location: "Snoqualmie Pass, WA",
+        placeId: "ChIJ7777777777777777777",
+        latitude: 47.3976,
+        longitude: -121.4426,
+        matchReason: "A much closer option, only a 45-minute drive from Seattle. Easy 2-mile walk to a spectacular 70-foot waterfall.",
+        difficulty: "Beginner",
+        driveTime: "45 mins",
+        distance: "28.5 mi",
+        recentTips: [
+          {
+            text: "Franklin Falls trail is fully open, no snow, beautiful water flow.",
+            date: "yesterday",
+            source: "WTA",
+            link: "https://www.wta.org"
+          }
+        ],
+        itinerary: [
+          { time: "09:00", action: "Depart Seattle" },
+          { time: "09:45", action: "Arrive at Franklin Falls Trailhead" },
+          { time: "10:00", action: "Start hike" },
+          { time: "10:45", action: "Reach waterfall views" },
+          { time: "11:30", action: "Return to car" }
+        ],
+        warnings: [],
+        relaxedConstraints: []
+      }
+    ],
+    generalExplanation: "Snoqualmie Pass weather is clear today, typical trailhead crowds. Driving time is under 45 minutes.",
     groundingMetadata: {
       searchEntryPoint: null,
       groundingChunks: [

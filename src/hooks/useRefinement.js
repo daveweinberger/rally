@@ -3,7 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../utils/firebase.js';
 import { simulateMockRefinementStream } from '../utils/mockTelemetry.js';
 
-export function useRefinement(initialConstraints, initialResults, generalExplanation) {
+export function useRefinement(initialConstraints, initialResults, generalExplanation, onUpdateResults) {
   // Formats initial query and results into standard chat history
   const buildInitialMessages = () => {
     if (!initialResults || initialResults.length === 0) return [];
@@ -57,7 +57,8 @@ ${generalExplanation}`;
       // Use client history context (excludes the placeholder)
       const response = refineFn({
         history: updatedMessages,
-        message: text
+        message: text,
+        constraints: initialConstraints
       });
 
       const stream = response.stream;
@@ -66,6 +67,11 @@ ${generalExplanation}`;
         console.warn("Streaming refinement is not supported by Firebase client SDK. Falling back.");
         const result = await response;
         const data = result.data;
+        
+        if (data.results && data.results.length > 0 && onUpdateResults) {
+          onUpdateResults(data.results, data.generalExplanation, data.groundingMetadata);
+        }
+        
         setMessages(prev => {
           const list = [...prev];
           list[list.length - 1] = {
@@ -97,6 +103,9 @@ ${generalExplanation}`;
         }
         
         if (data.done) {
+          if (data.results && data.results.length > 0 && onUpdateResults) {
+            onUpdateResults(data.results, data.generalExplanation, data.groundingMetadata);
+          }
           setMessages(prev => {
             const list = [...prev];
             list[list.length - 1] = {
@@ -126,6 +135,10 @@ ${generalExplanation}`;
             });
           });
           
+          if (finalResult.results && finalResult.results.length > 0 && onUpdateResults) {
+            onUpdateResults(finalResult.results, finalResult.generalExplanation, finalResult.groundingMetadata);
+          }
+          
           setMessages(prev => {
             const list = [...prev];
             list[list.length - 1] = {
@@ -148,7 +161,7 @@ ${generalExplanation}`;
     } finally {
       setIsStreaming(false);
     }
-  }, [messages]);
+  }, [messages, initialConstraints, onUpdateResults]);
 
   return {
     messages,

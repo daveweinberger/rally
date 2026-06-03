@@ -10,7 +10,7 @@ import { useRefinement } from './hooks/useRefinement.js';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { search, reset, results, generalExplanation, noResultsExplanation, groundingMetadata, status, statusMessage, error, isLoading } = useAdventureSearch();
+  const { search, reset, results, setResults, setGeneralExplanation, setGroundingMetadata, generalExplanation, noResultsExplanation, groundingMetadata, status, statusMessage, error, isLoading } = useAdventureSearch();
   const [activeConstraints, setActiveConstraints] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
 
@@ -180,6 +180,11 @@ function App() {
                   constraints={activeConstraints} 
                   results={results} 
                   explanation={generalExplanation} 
+                  onUpdateResults={(newResults, newExplanation, newMetadata) => {
+                    setResults(newResults);
+                    if (newExplanation) setGeneralExplanation(newExplanation);
+                    if (newMetadata) setGroundingMetadata(newMetadata);
+                  }}
                 />
               </>
             )}
@@ -212,8 +217,8 @@ function App() {
 }
 
 // Subcomponent wrapper for refinement chat so it resets fresh when search criteria change
-function RefinementSection({ constraints, results, explanation }) {
-  const { messages, sendMessage, isStreaming, error } = useRefinement(constraints, results, explanation);
+function RefinementSection({ constraints, results, explanation, onUpdateResults }) {
+  const { messages, sendMessage, isStreaming, error } = useRefinement(constraints, results, explanation, onUpdateResults);
   return (
     <ChatInterface
       messages={messages}

@@ -1,6 +1,6 @@
 /* global process */
 import { GoogleGenAI } from '@google/genai';
-import { SYSTEM_PROMPT, RESPONSE_SCHEMA } from './systemPrompt.js';
+import { SYSTEM_PROMPT, RESPONSE_SCHEMA, REFINEMENT_SCHEMA } from './systemPrompt.js';
 
 // Helper to initialize GoogleGenAI client
 function getGenAIClient() {
@@ -23,8 +23,18 @@ const SEATTLE_MOCK = {
       matchReason: "Moderate difficulty matches your intermediate level. Under 1 hour drive from Seattle. Dog-friendly and features a beautiful alpine lake.",
       difficulty: "Intermediate",
       recentTips: [
-        "Trail is muddy past mile 2, but snow is fully melted as of 2 days ago.",
-        "Parking lot is full by 8:30 AM on sunny Saturdays. Get there early!"
+        {
+          text: "Trail is muddy past mile 2, but snow is fully melted.",
+          date: "2 days ago",
+          source: "WTA",
+          link: "https://www.wta.org/go-hiking/hikes/snow-lake-1"
+        },
+        {
+          text: "Parking lot is full by 8:30 AM on sunny Saturdays. Get there early!",
+          date: "3 days ago",
+          source: "AllTrails",
+          link: "https://www.alltrails.com/trail/us/washington/snow-lake-trail"
+        }
       ],
       itinerary: [
         { time: "07:00", action: "Depart Seattle (I-90 E)" },
@@ -49,8 +59,18 @@ const SEATTLE_MOCK = {
       matchReason: "Short 45-minute drive. Easy to moderate level matches your preference. Great panoramic views of Rattlesnake Lake and the mountains.",
       difficulty: "Intermediate",
       recentTips: [
-        "Trail is dry and in excellent condition. Expect crowds after 10 AM.",
-        "Porta-potties at the trailhead are open and clean."
+        {
+          text: "Trail is dry and in excellent condition. Expect crowds after 10 AM.",
+          date: "4 hours ago",
+          source: "WTA",
+          link: "https://www.wta.org/go-hiking/hikes/rattlesnake-ledge"
+        },
+        {
+          text: "Porta-potties at the trailhead are open and clean.",
+          date: "yesterday",
+          source: "AllTrails",
+          link: "https://www.alltrails.com/trail/us/washington/rattlesnake-mountain-trail--2"
+        }
       ],
       itinerary: [
         { time: "08:30", action: "Depart Seattle" },
@@ -81,8 +101,18 @@ const GENERIC_MOCK = (location) => ({
       matchReason: "Great local option matching your experience level. Fits driving and time parameters.",
       difficulty: "Intermediate",
       recentTips: [
-        "Trail conditions are good. Wildflowers are blooming.",
-        "No active closures reported in the area."
+        {
+          text: "Trail conditions are good. Wildflowers are blooming.",
+          date: "10 hours ago",
+          source: "WTA",
+          link: "https://www.wta.org"
+        },
+        {
+          text: "No active closures reported in the area.",
+          date: "3 days ago",
+          source: "AllTrails",
+          link: "https://www.alltrails.com"
+        }
       ],
       itinerary: [
         { time: "08:00", action: `Depart ${location}` },
@@ -156,13 +186,19 @@ ${schemaString}
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [
-          { googleMaps: {} }
+          { googleMaps: {} },
+          { googleSearch: {} }
         ]
       }
     });
 
     const text = response.text;
     const groundingMetadata = response.candidates?.[0]?.groundingMetadata || {};
+
+    if (!text) {
+      console.error("Gemini response did not contain text. Full response object:", JSON.stringify(response, null, 2));
+      throw new Error("AI output was empty or blocked by safety/other filters.");
+    }
 
     let parsedData;
     try {
@@ -200,82 +236,134 @@ ${schemaString}
  * @param {function} onChunk - Callback for streaming chunks
  * @returns {Promise<object>} - Returns final accumulated response with grounding metadata
  */
-export async function getRefinementStream(history, newMessage, onChunk) {
+export async function getRefinementStream(history, newMessage) {
   const ai = getGenAIClient();
 
-  // Map history to Gemini format: { role: 'user'|'model', parts: [{ text: string }] }
-  const contents = history.map(msg => ({
-    role: msg.role === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.content }]
-  }));
+  const contents = [];
   
-  // Add the new user message only if it is not already the last message in history
+  // Map history to Gemini format, but exclude the very last user message if it is the new message
+  // because we want to format the new message with the schema instructions
+  const historyExcludeLast = [...history];
   const lastMsg = history[history.length - 1];
   const isLastMsgUserNewMessage = lastMsg && lastMsg.role === 'user' && lastMsg.content === newMessage;
   
-  if (!isLastMsgUserNewMessage) {
+  if (isLastMsgUserNewMessage) {
+    historyExcludeLast.pop();
+  }
+  
+  for (const msg of historyExcludeLast) {
     contents.push({
-      role: 'user',
-      parts: [{ text: newMessage }]
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }]
     });
   }
 
   if (!ai) {
-    console.warn("GEMINI_API_KEY is not set or placeholder. Streaming mock chat responses.");
-    // Simulate streaming for mock response
-    const mockResponseText = `Sure! I can help you refine your choices. If you want a closer hike than Snow Lake, I'd suggest checking out **Franklin Falls**. It's just a 45-minute drive from Seattle (right off Exit 47 on I-90). 
-    
-    It is an easy 2-mile round trip hike with very little elevation gain, featuring a beautiful 70-foot waterfall. It fits perfectly within a half-day window and is highly recommended for all skill levels! Let me know if you want me to update the itinerary for Franklin Falls instead!`;
-    
-    const chunks = mockResponseText.split(' ');
-    for (const chunk of chunks) {
-      onChunk(chunk + " ");
-      await new Promise(resolve => setTimeout(resolve, 80));
-    }
-    
+    console.warn("GEMINI_API_KEY is not set or placeholder. Returning mock chat refinement JSON.");
     return {
-      text: mockResponseText,
-      groundingMetadata: {
-        searchEntryPoint: {
-          renderedContent: "<a href='https://www.google.com/search?q=Franklin+Falls+conditions' target='_blank'>Search Google for Franklin Falls conditions</a>"
+      chatResponse: "I have updated your recommendations to focus on Franklin Falls as a closer alternative.",
+      activities: [
+        {
+          name: "Franklin Falls",
+          location: "Snoqualmie Pass, WA",
+          placeId: "ChIJ7777777777777777777",
+          latitude: 47.3976,
+          longitude: -121.4426,
+          matchReason: "A much closer option, only a 45-minute drive from Seattle. Easy 2-mile walk to a spectacular 70-foot waterfall.",
+          difficulty: "Beginner",
+          recentTips: [
+            {
+              text: "Franklin Falls trail is fully open, no snow, beautiful water flow.",
+              date: "yesterday",
+              source: "WTA",
+              link: "https://www.wta.org"
+            }
+          ],
+          itinerary: [
+            { time: "09:00", action: "Depart Seattle" },
+            { time: "09:45", action: "Arrive at Franklin Falls Trailhead" },
+            { time: "10:00", action: "Start hike" },
+            { time: "10:45", action: "Reach waterfall views" },
+            { time: "11:30", action: "Return to car" }
+          ],
+          warnings: [],
+          relaxedConstraints: []
         }
+      ],
+      generalExplanation: "- Snoqualmie Pass weather is clear today.\n- Typical weekend trailhead congestion near Franklin Falls.",
+      groundingMetadata: {
+        searchEntryPoint: null,
+        groundingChunks: []
       }
     };
   }
 
+  const schemaString = JSON.stringify(REFINEMENT_SCHEMA, null, 2);
+  const formattedNewMessage = `User request: "${newMessage}"
+
+Please respond with a JSON object matching this schema:
+${schemaString}
+
+IMPORTANT RULES:
+1. If the user's request changes the recommendations (e.g. they ask for a different area, closer options, easier trails, or a specific activity), you MUST generate a new set of 2 to 3 outdoor activity recommendations in the "activities" array. Ensure these activities fit all of their original constraints plus the new refinement.
+2. In the "chatResponse" field, write a brief, friendly response (strictly 2 to 3 sentences) confirming that the recommendations have been updated and summarizing the updates.
+3. If the user's request does NOT change the recommendations (e.g. they just asked a general question or clarified something), do NOT include the "activities" field (or leave it empty/null), and write your answer to their question in "chatResponse".
+4. You must output ONLY a valid JSON object matching the schema.
+`;
+
+  contents.push({
+    role: 'user',
+    parts: [{ text: formattedNewMessage }]
+  });
+
   try {
-    const responseStream = await ai.models.generateContentStream({
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: contents,
       config: {
-        systemInstruction: SYSTEM_PROMPT + "\n\nThis is a chat refinement phase. Respond in natural markdown format. Focus on helping the user adjust the recommendations based on their new request.",
+        systemInstruction: SYSTEM_PROMPT + "\n\nThis is the chat refinement phase. You must return a JSON object matching the refinement schema.",
         tools: [
-          { googleMaps: {} }
+          { googleMaps: {} },
+          { googleSearch: {} }
         ]
       }
     });
 
-    let fullText = "";
-    let finalCandidate = null;
+    const text = response.text;
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata || {};
 
-    for await (const chunk of responseStream) {
-      const textChunk = chunk.text;
-      if (textChunk) {
-        fullText += textChunk;
-        onChunk(textChunk);
+    if (!text) {
+      console.error("Gemini refinement response did not contain text. Full response object:", JSON.stringify(response, null, 2));
+      throw new Error("AI output was empty or blocked by safety/other filters.");
+    }
+
+    let parsedData;
+    try {
+      let cleanText = text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.substring(7);
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.substring(3);
       }
-      if (chunk.candidates?.[0]) {
-        finalCandidate = chunk.candidates[0];
+      if (cleanText.endsWith('```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
       }
+      cleanText = cleanText.trim();
+      parsedData = JSON.parse(cleanText);
+    } catch (parseErr) {
+      console.error("Failed to parse Gemini JSON refinement output. Raw output:", text);
+      throw new Error("AI output was not in the expected JSON format.", { cause: parseErr });
     }
 
     return {
-      text: stripCitations(fullText),
-      groundingMetadata: finalCandidate?.groundingMetadata || {}
+      chatResponse: parsedData.chatResponse,
+      activities: parsedData.activities || [],
+      generalExplanation: parsedData.generalExplanation || '',
+      groundingMetadata: groundingMetadata
     };
 
   } catch (error) {
-    console.error("Gemini streaming failed:", error);
+    console.error("Gemini refinement failed:", error);
     throw error;
   }
 }

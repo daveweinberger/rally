@@ -1,4 +1,4 @@
-export default function Attribution({ groundingMetadata }) {
+export default function Attribution({ groundingMetadata, isChat }) {
   if (!groundingMetadata) return null;
 
   const { groundingChunks, searchEntryPoint } = groundingMetadata;
@@ -25,7 +25,7 @@ export default function Attribution({ groundingMetadata }) {
     }
   }
 
-  const hasMaps = mapsChunks.length > 0;
+  const hasMaps = mapsChunks.length > 0 && !isChat;
   const hasSearch = !!searchEntryPoint?.renderedContent || webChunks.length > 0;
 
   if (!hasMaps && !hasSearch) return null;

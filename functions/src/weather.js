@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { getCache, setCache } from './cache.js';
 
 /**
  * Calculates the day offset (0 to 5) from today based on the target day string
@@ -48,6 +49,18 @@ export async function fetchWeather(latitude, longitude, targetDayString) {
   }
 
   const dayOffset = getDayOffset(targetDayString);
+  
+  // Cache weather by rounding lat/lng to 2 decimal places (~1.1 km accuracy)
+  const latRound = latitude.toFixed(2);
+  const lngRound = longitude.toFixed(2);
+  const cacheKey = `weather_${latRound}_${lngRound}_offset_${dayOffset}`;
+
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    console.log(`Weather Cache Hit for ${latRound}, ${lngRound} (offset ${dayOffset})`);
+    return cached;
+  }
+
   const url = `https://weather.googleapis.com/v1/forecast/days:lookup?key=${apiKey}&location.latitude=${latitude}&location.longitude=${longitude}&days=6&unitsSystem=IMPERIAL`;
 
   try {
@@ -67,13 +80,17 @@ export async function fetchWeather(latitude, longitude, targetDayString) {
     const offset = Math.min(dayOffset, data.forecastDays.length - 1);
     const forecast = data.forecastDays[offset];
     
-    return {
+    const result = {
       maxTemp: forecast.maxTemperature?.degrees ?? null,
       minTemp: forecast.minTemperature?.degrees ?? null,
       condition: forecast.daytimeForecast?.weatherCondition?.description?.text ?? 'Unknown',
       conditionType: forecast.daytimeForecast?.weatherCondition?.type ?? 'UNKNOWN',
       rainProbability: forecast.daytimeForecast?.precipitation?.probability?.percent ?? 0
     };
+
+    // Cache weather forecast for 1 hour (3600 seconds)
+    await setCache(cacheKey, result, 3600);
+    return result;
   } catch (error) {
     console.error(`Failed to fetch weather for coordinates ${latitude}, ${longitude}:`, error);
     return null;

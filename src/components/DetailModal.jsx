@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { X, MapPin, AlertTriangle, Route } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Route, ExternalLink } from 'lucide-react';
 import Attribution from './Attribution.jsx';
 
 export default function DetailModal({ activity, onClose, generalAttribution, constraints }) {
@@ -160,11 +160,71 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
               <h3 style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                 Recent Reports & Tips
               </h3>
-              <ul style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)' }}>
-                {activity.recentTips.map((tip, idx) => (
-                  <li key={idx} style={{ marginBottom: '4px' }}>"{tip}"</li>
-                ))}
-              </ul>
+              <div className="flex-col gap-sm" style={{ gap: '10px' }}>
+                {activity.recentTips.map((tip, idx) => {
+                  const tipText = typeof tip === 'object' ? tip.text : tip;
+                  const tipDate = typeof tip === 'object' ? tip.date : null;
+                  const tipSource = typeof tip === 'object' ? tip.source : null;
+                  const tipLink = typeof tip === 'object' ? tip.link : null;
+
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '10px',
+                        padding: '0.85rem 1rem',
+                        fontSize: '0.82rem',
+                        lineHeight: 1.45,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                        transition: 'border-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.2)'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
+                    >
+                      <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        "{tipText}"
+                      </p>
+                      {(tipSource || tipDate) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {tipSource && (
+                            <>
+                              {tipLink ? (
+                                <a 
+                                  href={tipLink} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  style={{ 
+                                    color: 'var(--accent-moss)', 
+                                    textDecoration: 'none', 
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                >
+                                  <span>{tipSource}</span>
+                                  <ExternalLink size={10} style={{ opacity: 0.8 }} />
+                                </a>
+                              ) : (
+                                <span style={{ fontWeight: 600 }}>{tipSource}</span>
+                              )}
+                            </>
+                          )}
+                          {tipSource && tipDate && <span>•</span>}
+                          {tipDate && <span>{tipDate}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
