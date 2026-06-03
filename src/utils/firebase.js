@@ -1,0 +1,24 @@
+import { initializeApp } from 'firebase/app';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+
+// Load values from Vite env vars, fallback to placeholders for local dev
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "placeholder-api-key",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "rally-quest.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "rally-quest",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "rally-quest.appspot.com",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "placeholder-sender-id",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "placeholder-app-id",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "placeholder-measurement-id"
+};
+
+const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app, 'us-central1');
+
+// Connect to functions emulator if running locally and explicitly requested
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true') {
+  console.log("Connecting Firebase Functions client to emulator on localhost:5001");
+  connectFunctionsEmulator(functions, 'localhost', 5001);
+}
+
+export { app, functions };
