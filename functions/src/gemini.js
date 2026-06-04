@@ -161,7 +161,11 @@ export async function getRecommendations(constraints, startWeather) {
   
   let weatherInfo = "";
   if (startWeather) {
-    weatherInfo = `\n- Starting Location Weather Forecast for target date: ${startWeather.condition}, temperature high ${startWeather.maxTemp}°F, low ${startWeather.minTemp}°F, chance of rain: ${startWeather.rainProbability}%. Use this forecast to evaluate nearby trails. Avoid recommending trails in areas with active rain/precipitation if alternatives with better weather are available.`;
+    if (constraints.allowInclementWeather) {
+      weatherInfo = `\n- Starting Location Weather Forecast for target date: ${startWeather.condition}, temperature high ${startWeather.maxTemp}°F, low ${startWeather.minTemp}°F, chance of rain: ${startWeather.rainProbability}%. Note: The user has explicitly chosen to proceed despite inclement weather. Do NOT filter out trails or activities based on active rain, snow, or precipitation; prioritize recommending available activities for this date, noting any relevant gear/safety tips in the warnings or tips.`;
+    } else {
+      weatherInfo = `\n- Starting Location Weather Forecast for target date: ${startWeather.condition}, temperature high ${startWeather.maxTemp}°F, low ${startWeather.minTemp}°F, chance of rain: ${startWeather.rainProbability}%. Use this forecast to evaluate nearby trails. Avoid recommending trails in areas with active rain/precipitation if alternatives with better weather are available.`;
+    }
   }
 
   const schemaString = JSON.stringify(RESPONSE_SCHEMA, null, 2);

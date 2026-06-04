@@ -3,19 +3,25 @@ import { Compass, Loader2 } from 'lucide-react';
 
 const detectLocale = (startLocation) => {
   const loc = (startLocation || '').toLowerCase();
-  if (loc.includes('seattle') || loc.includes('bellevue') || loc.includes('tacoma') || loc.includes('wa') || loc.includes('washington') || loc.includes('gps')) {
+  
+  const containsWord = (word) => {
+    const regex = new RegExp(`\\b${word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+    return regex.test(loc);
+  };
+
+  if (containsWord('seattle') || containsWord('bellevue') || containsWord('tacoma') || containsWord('wa') || containsWord('washington') || containsWord('gps')) {
     return 'PNW'; // Pacific Northwest
   }
-  if (loc.includes('los angeles') || loc.includes('la') || loc.includes('san diego') || loc.includes('ca') || loc.includes('california') || loc.includes('san francisco') || loc.includes('sf') || loc.includes('yosemite')) {
+  if (containsWord('los angeles') || containsWord('la') || containsWord('san diego') || containsWord('ca') || containsWord('california') || containsWord('san francisco') || containsWord('sf') || containsWord('yosemite')) {
     return 'CA'; // California
   }
-  if (loc.includes('denver') || loc.includes('boulder') || loc.includes('co') || loc.includes('colorado') || loc.includes('aspen') || loc.includes('rocky')) {
+  if (containsWord('denver') || containsWord('boulder') || containsWord('co') || containsWord('colorado') || containsWord('aspen') || containsWord('rocky')) {
     return 'CO'; // Colorado
   }
-  if (loc.includes('portland') || loc.includes('or') || loc.includes('oregon') || loc.includes('hood') || loc.includes('bend')) {
+  if (containsWord('portland') || containsWord('or') || containsWord('oregon') || containsWord('hood') || containsWord('bend')) {
     return 'OR'; // Oregon
   }
-  if (loc.includes('new york') || loc.includes('nyc') || loc.includes('ny') || loc.includes('new jersey') || loc.includes('nj') || loc.includes('brooklyn') || loc.includes('hudson')) {
+  if (containsWord('new york') || containsWord('nyc') || containsWord('ny') || containsWord('new jersey') || containsWord('nj') || containsWord('brooklyn') || containsWord('hudson')) {
     return 'NY'; // New York / Tri-State
   }
   return 'GENERIC';

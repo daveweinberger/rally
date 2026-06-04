@@ -21,6 +21,8 @@ function App() {
     }
   }, [status]);
 
+  const [focusField, setFocusField] = useState(null);
+
   const handleSearchSubmit = (constraints) => {
     setActiveConstraints(constraints);
     search(constraints);
@@ -29,6 +31,21 @@ function App() {
   const handleReset = () => {
     setActiveConstraints(null);
     setSelectedActivity(null);
+    setFocusField(null);
+    reset();
+  };
+
+  const handleProceedInclement = () => {
+    const updatedConstraints = {
+      ...activeConstraints,
+      allowInclementWeather: true
+    };
+    setActiveConstraints(updatedConstraints);
+    search(updatedConstraints);
+  };
+
+  const handleQuickModify = (field) => {
+    setFocusField(field);
     reset();
   };
 
@@ -53,7 +70,12 @@ function App() {
                 Enter your starting location and preferences below. We will calculate the optimal route options, itineraries, and live weather conditions.
               </p>
             </div>
-            <InputPanel onSubmit={handleSearchSubmit} initialConstraints={activeConstraints} />
+            <InputPanel 
+              onSubmit={handleSearchSubmit} 
+              initialConstraints={activeConstraints} 
+              autoFocusField={focusField}
+              onClearAutoFocus={() => setFocusField(null)}
+            />
           </div>
         )}
 
@@ -92,39 +114,59 @@ function App() {
         {status === 'done' && (
           <div className="flex-col gap-lg" style={{ animation: 'fadeIn 0.3s ease both' }}>
             {results.length === 0 ? (
-              <div className="glass-card flex-col align-center gap-md" style={{ padding: '3rem 2rem', textAlign: 'center', borderTop: '4px solid #e0a150' }}>
+              <div className="glass-card flex-col align-center gap-md" style={{ padding: '2.5rem 2rem', textAlign: 'center', borderTop: '4px solid #e0a150' }}>
                 <div style={{
                   background: 'rgba(217, 119, 6, 0.1)',
                   border: '1px solid rgba(217, 119, 6, 0.2)',
                   borderRadius: '50%',
-                  width: '64px',
-                  height: '64px',
+                  width: '56px',
+                  height: '56px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#e0a150',
-                  margin: '0 auto 0.5rem auto'
+                  margin: '0 auto 0.25rem auto'
                 }}>
-                  <AlertTriangle size={32} />
+                  <AlertTriangle size={28} />
                 </div>
                 
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>No Matching Adventures Found</h2>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800 }}>No Matching Adventures Found</h2>
                 
                 <p style={{
-                  fontSize: '0.92rem',
+                  fontSize: '0.9rem',
                   color: 'var(--text-secondary)',
-                  lineHeight: 1.6,
+                  lineHeight: 1.5,
                   maxWidth: '500px',
                   margin: '0 auto'
                 }}>
-                  {noResultsExplanation || "We couldn't find any activities matching your exact constraints and weather conditions. Some activities may be out of season."}
+                  We couldn't find any activities matching your exact preferences under the current weather forecast.
                 </p>
 
-                <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                  <button onClick={handleReset} className="glass-btn glass-btn-primary">
-                    <RotateCcw size={16} />
-                    Modify Search Options
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '400px', margin: '1.5rem auto 0 auto' }}>
+                  <button onClick={handleProceedInclement} className="glass-btn glass-btn-primary" style={{ width: '100%' }}>
+                    Proceed with Inclement Weather Options
                   </button>
+                  
+                  <div style={{ margin: '0.75rem 0 0.25rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <span style={{ height: '1px', background: 'rgba(255,255,255,0.08)', flex: 1 }}></span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Or, modify preferences</span>
+                    <span style={{ height: '1px', background: 'rgba(255,255,255,0.08)', flex: 1 }}></span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button onClick={() => handleQuickModify('location')} className="glass-btn glass-btn-outline" style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', justifyContent: 'center' }}>
+                      Edit Location
+                    </button>
+                    <button onClick={() => handleQuickModify('date')} className="glass-btn glass-btn-outline" style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', justifyContent: 'center' }}>
+                      Change Date
+                    </button>
+                    <button onClick={() => handleQuickModify('activities')} className="glass-btn glass-btn-outline" style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', justifyContent: 'center' }}>
+                      Edit Activities
+                    </button>
+                    <button onClick={() => handleQuickModify('drive')} className="glass-btn glass-btn-outline" style={{ fontSize: '0.78rem', padding: '0.55rem 0.75rem', justifyContent: 'center' }}>
+                      Adjust Drive Time
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

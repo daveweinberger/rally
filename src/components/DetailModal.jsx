@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { X, MapPin, AlertTriangle, Route, ExternalLink } from 'lucide-react';
 import Attribution from './Attribution.jsx';
 
@@ -37,6 +37,16 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
     ? `${constraints.startCoords.latitude},${constraints.startCoords.longitude}`
     : (constraints?.startLocation || 'Seattle, WA');
 
+  const [localItinerary, setLocalItinerary] = useState([]);
+
+  useEffect(() => {
+    if (activity && activity.itinerary) {
+      setLocalItinerary(activity.itinerary);
+    } else {
+      setLocalItinerary([]);
+    }
+  }, [activity]);
+
   // Prevent body scrolling when modal is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -44,6 +54,30 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
       document.body.style.overflow = 'unset';
     };
   }, []);
+
+  const timeToMinutes = (timeStr) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const minutesToTime = (totalMinutes) => {
+    const normalized = (totalMinutes + 24 * 60) % (24 * 60);
+    const h = Math.floor(normalized / 60);
+    const m = normalized % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const handleTimeChange = (index, newTimeStr) => {
+    if (!newTimeStr || !localItinerary[index]) return;
+    const oldTimeMinutes = timeToMinutes(localItinerary[index].time);
+    const newTimeMinutes = timeToMinutes(newTimeStr);
+    const delta = newTimeMinutes - oldTimeMinutes;
+    
+    setLocalItinerary(prev => prev.map(item => ({
+      ...item,
+      time: minutesToTime(timeToMinutes(item.time) + delta)
+    })));
+  };
 
   if (!activity) return null;
 
@@ -159,7 +193,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
           )}
 
           {/* Chronological Itinerary */}
-          {activity.itinerary && activity.itinerary.length > 0 && (
+          {localItinerary && localItinerary.length > 0 && (
             <div className="flex-col gap-sm">
               <h3 style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                 Suggested Timeline
@@ -170,12 +204,33 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
                 borderRadius: '12px',
                 padding: '0.85rem 1.15rem'
               }}>
-                {activity.itinerary.map((item, idx) => (
-                  <div key={idx} className="telemetry-row">
-                    <span className="telemetry-label" style={{ fontWeight: 600 }}>
-                      {item.time}
-                    </span>
-                    <span className="telemetry-val" style={{ textAlign: 'right' }}>
+                {localItinerary.map((item, idx) => (
+                  <div key={idx} className="telemetry-row" style={{ display: 'flex', alignItems: 'center', padding: '0.4rem 0' }}>
+                    <div style={{ width: '125px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type="time"
+                        value={item.time}
+                        onChange={(e) => handleTimeChange(idx, e.target.value)}
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: '0.85rem',
+                          padding: '4px 6px',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          textAlign: 'center',
+                          transition: 'border-color 0.2s, background-color 0.2s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--accent-moss)'}
+                        onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                      />
+                    </div>
+                    <span className="telemetry-val" style={{ textAlign: 'left', fontSize: '0.88rem', flex: 1, marginLeft: '16px' }}>
                       {item.action}
                     </span>
                   </div>
@@ -197,6 +252,15 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
                   const tipSource = typeof tip === 'object' ? tip.source : null;
                   const tipLink = typeof tip === 'object' ? tip.link : null;
 
+                  const isVerbatim = (() => {
+                    if (!tipSource) return false;
+                    const src = tipSource.toLowerCase();
+                    const dt = (tipDate || '').toLowerCase();
+                    if (src.includes('general guidance') || src.includes('seasonal patterns') || src.includes('seasonal average')) return false;
+                    if (dt.includes('general guidance') || dt.includes('seasonal patterns') || dt.includes('seasonal average')) return false;
+                    return true;
+                  })();
+
                   return (
                     <div 
                       key={idx} 
@@ -216,9 +280,15 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
                       onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.2)'}
                       onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
                     >
-                      <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        "{tipText}"
-                      </p>
+                      {isVerbatim ? (
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          "{tipText}"
+                        </p>
+                      ) : (
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'normal' }}>
+                          {tipText}
+                        </p>
+                      )}
                       {(tipSource || tipDate) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {tipSource && (

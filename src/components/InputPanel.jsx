@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Navigation, Clock, Compass, Locate, Calendar, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Navigation, Clock, Compass, Locate, Calendar, ChevronDown, AlertTriangle, Check, X, Plus } from 'lucide-react';
 import { getActivitySeasonStatus } from '../utils/seasonalUtils.js';
 
 const TIME_OPTIONS = [
@@ -45,7 +45,7 @@ const getUpcomingDays = () => {
   return days;
 };
 
-function CustomDropdown({ value, options, onChange, icon: Icon }) {
+function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -64,6 +64,7 @@ function CustomDropdown({ value, options, onChange, icon: Icon }) {
   return (
     <div className="custom-dropdown-container" ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
       <button
+        id={id}
         type="button"
         className="glass-input custom-dropdown-trigger"
         onClick={() => setIsOpen(!isOpen)}
@@ -143,7 +144,357 @@ function CustomDropdown({ value, options, onChange, icon: Icon }) {
   );
 }
 
-export default function InputPanel({ onSubmit, initialConstraints }) {
+function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAddCustom, onRemoveCustom, customActivities, activityOptions, targetDay, startCoords, startLocation }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const dropdownRef = useRef(null);
+  const customInputRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setShowCustomInput(false);
+        setCustomInput('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (showCustomInput && customInputRef.current) {
+      customInputRef.current.focus();
+    }
+  }, [showCustomInput]);
+
+  // Filter out off-season activities
+  const visibleOptions = activityOptions.filter(opt => {
+    const status = getActivitySeasonStatus(opt.id, targetDay, startCoords?.latitude, startLocation);
+    return status !== 'off-season';
+  });
+
+  const allSelected = [...selectedActivities];
+  const displayLabel = allSelected.length === 0
+    ? 'Select activities...'
+    : allSelected.length <= 2
+      ? allSelected.map(a => {
+          const opt = activityOptions.find(o => o.id === a);
+          return opt ? opt.label : a;
+        }).join(', ')
+      : `${allSelected.length} activities selected`;
+
+  const handleAddCustom = () => {
+    const trimmed = customInput.trim();
+    if (trimmed && !customActivities.includes(trimmed) && !allSelected.includes(trimmed)) {
+      onAddCustom(trimmed);
+      setCustomInput('');
+      setShowCustomInput(false);
+    }
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      {/* Trigger button */}
+      <button
+        id="activities-dropdown-trigger"
+        type="button"
+        className="glass-input custom-dropdown-trigger"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingLeft: '1rem',
+          paddingRight: '1rem',
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+          position: 'relative',
+          minHeight: '46px'
+        }}
+      >
+        <span style={{ color: allSelected.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.95rem' }}>
+          {displayLabel}
+        </span>
+        <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }} />
+      </button>
+
+      {/* Selected chips below trigger */}
+      {allSelected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          {allSelected.map(activity => {
+            const opt = activityOptions.find(o => o.id === activity);
+            const label = opt ? opt.label : activity;
+            const isCustom = customActivities.includes(activity);
+            const seasonStatus = !isCustom ? getActivitySeasonStatus(activity, targetDay, startCoords?.latitude, startLocation) : 'in-season';
+            const isShoulder = seasonStatus === 'shoulder';
+
+            return (
+              <span
+                key={activity}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  borderRadius: '20px',
+                  background: isShoulder ? 'rgba(217, 119, 6, 0.15)' : 'rgba(72, 178, 124, 0.15)',
+                  color: isShoulder ? '#e0a150' : 'var(--accent-moss)',
+                  border: `1px solid ${isShoulder ? 'rgba(217, 119, 6, 0.3)' : 'rgba(72, 178, 124, 0.3)'}`,
+                  animation: 'fadeIn 0.15s ease both'
+                }}
+              >
+                {label}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isCustom) {
+                      onRemoveCustom(activity);
+                    } else {
+                      onToggle(activity);
+                    }
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0',
+                    marginLeft: '2px'
+                  }}
+                  title="Remove"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Dropdown menu */}
+      {isOpen && (
+        <div
+          className="custom-dropdown-menu"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            right: 0,
+            background: 'rgba(28, 42, 35, 0.98)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+            zIndex: 20,
+            overflow: 'hidden',
+            maxHeight: '280px',
+            overflowY: 'auto',
+            animation: 'dropdownFadeIn 0.15s ease both'
+          }}
+        >
+          {visibleOptions.map(opt => {
+            const isSelected = selectedActivities.includes(opt.id);
+            const seasonStatus = getActivitySeasonStatus(opt.id, targetDay, startCoords?.latitude, startLocation);
+            const isShoulder = seasonStatus === 'shoulder';
+
+            return (
+              <div
+                key={opt.id}
+                onClick={() => onToggle(opt.id)}
+                className="custom-dropdown-option"
+                style={{
+                  padding: '0.7rem 1rem',
+                  fontSize: '0.9rem',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontWeight: isSelected ? 600 : 500,
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {opt.label}
+                  {isShoulder && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      color: '#e0a150',
+                      background: 'rgba(217, 119, 6, 0.12)',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      <Clock size={8} /> Shoulder
+                    </span>
+                  )}
+                </span>
+                {isSelected && (
+                  <Check size={16} style={{ color: 'var(--accent-moss)', flexShrink: 0 }} />
+                )}
+              </div>
+            );
+          })}
+
+          {/* Custom activities in dropdown */}
+          {customActivities.map(ca => (
+            <div
+              key={ca}
+              onClick={() => onRemoveCustom(ca)}
+              className="custom-dropdown-option"
+              style={{
+                padding: '0.7rem 1rem',
+                fontSize: '0.9rem',
+                color: 'var(--text-primary)',
+                background: 'transparent',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontWeight: 600,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {ca}
+                <span style={{
+                  fontSize: '0.62rem',
+                  color: 'var(--text-muted)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  fontWeight: 600
+                }}>Custom</span>
+              </span>
+              <Check size={16} style={{ color: 'var(--accent-moss)', flexShrink: 0 }} />
+            </div>
+          ))}
+
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '0' }} />
+
+          {/* Other / Custom input */}
+          {!showCustomInput ? (
+            <div
+              onClick={() => setShowCustomInput(true)}
+              className="custom-dropdown-option"
+              style={{
+                padding: '0.7rem 1rem',
+                fontSize: '0.9rem',
+                color: 'var(--text-muted)',
+                background: 'transparent',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 500,
+                fontStyle: 'italic'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <Plus size={14} style={{ color: 'var(--text-muted)' }} />
+              Other...
+            </div>
+          ) : (
+            <div style={{
+              padding: '0.5rem 0.75rem',
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center'
+            }}>
+              <input
+                ref={customInputRef}
+                type="text"
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustom();
+                  }
+                  if (e.key === 'Escape') {
+                    setShowCustomInput(false);
+                    setCustomInput('');
+                  }
+                }}
+                placeholder="Type an activity..."
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.85rem',
+                  fontFamily: 'var(--font-sans)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddCustom}
+                disabled={!customInput.trim()}
+                style={{
+                  background: customInput.trim() ? 'var(--accent-moss)' : 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  color: customInput.trim() ? '#fff' : 'var(--text-muted)',
+                  cursor: customInput.trim() ? 'pointer' : 'default',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0
+                }}
+              >
+                Add
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const formatNominatimName = (item) => {
+  const address = item.address || {};
+  const city = address.city || address.town || address.village || address.hamlet || address.suburb;
+  const state = address.state;
+  const country = address.country;
+  
+  if (city && state) {
+    return `${city}, ${state}`;
+  }
+  if (city && country) {
+    return `${city}, ${country}`;
+  }
+  return item.display_name.split(',').slice(0, 3).join(',').trim();
+};
+
+export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus }) {
   const upcomingDays = getUpcomingDays();
   
   const [startLocation, setStartLocation] = useState(initialConstraints?.startLocation || 'Seattle, WA');
@@ -156,28 +507,119 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
   const [experienceLevel, setExperienceLevel] = useState(initialConstraints?.experienceLevel || 'Intermediate');
   const [notes, setNotes] = useState(initialConstraints?.notes || '');
   const [validationError, setValidationError] = useState('');
+  const [customActivities, setCustomActivities] = useState([]);
+  
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [shouldFetch, setShouldFetch] = useState(false);
+  const [locationSource, setLocationSource] = useState(initialConstraints?.startCoords ? 'gps' : null);
+  
+  const locationRef = useRef(null);
 
-  const toggleActivity = (activity) => {
-    const seasonStatus = getActivitySeasonStatus(activity, targetDay, startCoords?.latitude, startLocation);
-    if (seasonStatus === 'off-season') {
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (locationRef.current && !locationRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldFetch || startLocation.trim().length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
-    if (selectedActivities.includes(activity)) {
-      if (selectedActivities.length > 1) {
-        setSelectedActivities(selectedActivities.filter(a => a !== activity));
+    
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocation)}&limit=5&addressdetails=1`,
+          {
+            headers: {
+              'Accept-Language': 'en-US,en;q=0.9',
+              'User-Agent': 'Rally-Adventure-Planner'
+            }
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data);
+          setShowSuggestions(true);
+        }
+      } catch (err) {
+        console.error("Typeahead fetching failed:", err);
       }
-    } else {
-      setSelectedActivities([...selectedActivities, activity]);
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [startLocation, shouldFetch]);
+
+  useEffect(() => {
+    if (autoFocusField) {
+      const timer = setTimeout(() => {
+        let el;
+        if (autoFocusField === 'location') {
+          el = document.getElementById('location-input');
+        } else if (autoFocusField === 'date') {
+          el = document.getElementById('date-dropdown-trigger');
+        } else if (autoFocusField === 'activities') {
+          el = document.getElementById('activities-dropdown-trigger');
+        } else if (autoFocusField === 'drive') {
+          el = document.getElementById('drive-dropdown-trigger');
+        }
+        
+        if (el) {
+          el.focus();
+          if (autoFocusField !== 'location') {
+            el.click();
+          }
+        }
+      }, 80);
+      onClearAutoFocus();
+      return () => clearTimeout(timer);
     }
+  }, [autoFocusField, onClearAutoFocus]);
+
+  const toggleActivity = (activity) => {
+    let next;
+    if (selectedActivities.includes(activity)) {
+      next = selectedActivities.filter(a => a !== activity);
+    } else {
+      next = [...selectedActivities, activity];
+    }
+    setSelectedActivities(next);
+    if (next.length > 0) {
+      setValidationError('');
+    }
+  };
+
+  const addCustomActivity = (name) => {
+    setCustomActivities(prev => [...prev, name]);
+    setSelectedActivities(prev => {
+      const next = [...prev, name];
+      if (next.length > 0) {
+        setValidationError('');
+      }
+      return next;
+    });
+  };
+
+  const removeCustomActivity = (name) => {
+    setCustomActivities(prev => prev.filter(a => a !== name));
+    setSelectedActivities(prev => prev.filter(a => a !== name));
   };
 
   const filterOffSeasonActivities = (day, locText, coords) => {
     setSelectedActivities(prev => {
       const valid = prev.filter(activity => {
+        const isCustom = !ACTIVITY_OPTIONS.some(opt => opt.id === activity);
+        if (isCustom) return true;
         const status = getActivitySeasonStatus(activity, day, coords?.latitude, locText);
         return status !== 'off-season';
       });
-      if (valid.length === 0) return ['Hiking'];
       const changed = valid.length !== prev.length || valid.some((v, i) => v !== prev[i]);
       return changed ? valid : prev;
     });
@@ -192,8 +634,13 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
     setStartLocation(val);
     if (startCoords) {
       setStartCoords(null);
+      setLocationSource(null);
     }
     filterOffSeasonActivities(targetDay, val, null);
+    if (val.trim() !== '') {
+      setValidationError('');
+    }
+    setShouldFetch(true);
   };
 
   const requestGeolocation = () => {
@@ -209,6 +656,7 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
         const { latitude, longitude } = position.coords;
         const coords = { latitude, longitude };
         setStartCoords(coords);
+        setLocationSource('gps');
         
         try {
           const response = await fetch(
@@ -263,12 +711,43 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
     );
   };
 
+  const handleSelectSuggestion = (item) => {
+    const formatted = formatNominatimName(item);
+    setStartLocation(formatted);
+    const coords = { latitude: parseFloat(item.lat), longitude: parseFloat(item.lon) };
+    setStartCoords(coords);
+    setLocationSource('typeahead');
+    setShouldFetch(false);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    
+    // Clear validation if it was showing
+    setValidationError('');
+
+    // Run season filtering with the new location and coords
+    filterOffSeasonActivities(targetDay, formatted, coords);
+  };
+
+  const isFormComplete = startLocation.trim() !== '' && selectedActivities.length > 0;
+
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!startLocation.trim()) {
-      setValidationError('Starting location required to calculate routes.');
+    const hasLocation = startLocation.trim() !== '';
+    const hasActivities = selectedActivities.length > 0;
+
+    if (!hasLocation && !hasActivities) {
+      setValidationError('Please enter a starting point and select at least one activity.');
       return;
     }
+    if (!hasLocation) {
+      setValidationError('Please enter a starting point.');
+      return;
+    }
+    if (!hasActivities) {
+      setValidationError('Please select at least one preferred activity.');
+      return;
+    }
+
     setValidationError('');
     onSubmit({
       startLocation,
@@ -285,20 +764,30 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
   return (
     <form onSubmit={handleFormSubmit} className="flex-col gap-lg" style={{ width: '100%' }}>
       {/* Starting Location */}
-      <div className="flex-col">
+      <div className="flex-col" ref={locationRef} style={{ position: 'relative' }}>
         <label className="glass-label">
           <span>Starting Point</span>
-          {startCoords && <span className="glass-label-badge">GPS Active</span>}
+          {startCoords && (
+            <span className="glass-label-badge">
+              {locationSource === 'gps' ? 'GPS Active' : locationSource === 'typeahead' ? 'Location Synced' : 'Coordinates Set'}
+            </span>
+          )}
         </label>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Navigation size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-secondary)' }} />
           <input
+            id="location-input"
             type="text"
             className="glass-input"
             style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
             placeholder="Enter city, trailhead, or use GPS"
             value={startLocation}
             onChange={(e) => handleLocationChange(e.target.value)}
+            onFocus={() => {
+              if (suggestions.length > 0) {
+                setShowSuggestions(true);
+              }
+            }}
           />
           <button
             type="button"
@@ -321,6 +810,52 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
             <Locate size={16} className={isLocating ? 'pulse-green' : ''} />
           </button>
         </div>
+
+        {/* Typeahead Suggestions Dropdown */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div
+            className="custom-dropdown-menu"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              right: 0,
+              background: 'rgba(28, 42, 35, 0.98)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+              zIndex: 30,
+              maxHeight: '220px',
+              overflowY: 'auto',
+              animation: 'dropdownFadeIn 0.15s ease both'
+            }}
+          >
+            {suggestions.map((item, idx) => {
+              const displayName = formatNominatimName(item);
+              return (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectSuggestion(item)}
+                  className="custom-dropdown-option"
+                  style={{
+                    padding: '0.7rem 1rem',
+                    fontSize: '0.88rem',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                    transition: 'background 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {displayName}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Row: Available Time, Driving radius, & Target Day */}
@@ -342,6 +877,7 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
             <span>Max Driving Time</span>
           </label>
           <CustomDropdown
+            id="drive-dropdown-trigger"
             value={maxDriveTime}
             options={DRIVE_OPTIONS}
             onChange={setMaxDriveTime}
@@ -354,6 +890,7 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
             <span>Adventure Date</span>
           </label>
           <CustomDropdown
+            id="date-dropdown-trigger"
             value={targetDay}
             options={upcomingDays}
             onChange={handleTargetDayChange}
@@ -362,72 +899,22 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
         </div>
       </div>
 
-      {/* Activities Grid */}
+      {/* Activities Dropdown */}
       <div className="flex-col">
         <label className="glass-label">
           <span>Preferred Activities</span>
         </label>
-        <div className="glass-checkbox-group">
-          {ACTIVITY_OPTIONS.map(opt => {
-            const isActive = selectedActivities.includes(opt.id);
-            const seasonStatus = getActivitySeasonStatus(opt.id, targetDay, startCoords?.latitude, startLocation);
-            const isOff = seasonStatus === 'off-season';
-            const isShoulder = seasonStatus === 'shoulder';
-
-            return (
-              <div
-                key={opt.id}
-                onClick={() => toggleActivity(opt.id)}
-                className={`glass-toggle-card ${isActive && !isOff ? 'active-green' : ''}`}
-                style={{
-                  opacity: isOff ? 0.45 : 1,
-                  cursor: isOff ? 'not-allowed' : 'pointer',
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  padding: '0.85rem 0.5rem',
-                  border: isOff
-                    ? '1px dashed rgba(255, 255, 255, 0.05)'
-                    : isShoulder && isActive
-                      ? '1px solid rgba(217, 119, 6, 0.5)'
-                      : undefined
-                }}
-              >
-                <span style={{ fontWeight: isActive && !isOff ? 600 : 500 }}>{opt.label}</span>
-                {isOff && (
-                  <span style={{
-                    fontSize: '0.62rem',
-                    color: 'var(--text-muted)',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    padding: '1px 4px',
-                    borderRadius: '4px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Off-Season
-                  </span>
-                )}
-                {isShoulder && (
-                  <span style={{
-                    fontSize: '0.62rem',
-                    color: '#e0a150',
-                    background: 'rgba(217, 119, 6, 0.12)',
-                    padding: '1px 4px',
-                    borderRadius: '4px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px'
-                  }}>
-                    <Clock size={8} /> Shoulder
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <MultiSelectActivityDropdown
+          selectedActivities={selectedActivities}
+          onToggle={toggleActivity}
+          onAddCustom={addCustomActivity}
+          onRemoveCustom={removeCustomActivity}
+          customActivities={customActivities}
+          activityOptions={ACTIVITY_OPTIONS}
+          targetDay={targetDay}
+          startCoords={startCoords}
+          startLocation={startLocation}
+        />
 
         {/* Soft warning for shoulder seasons */}
         {selectedActivities.some(a => getActivitySeasonStatus(a, targetDay, startCoords?.latitude, startLocation) === 'shoulder') && (
@@ -509,26 +996,37 @@ export default function InputPanel({ onSubmit, initialConstraints }) {
 
       {validationError && (
         <div style={{
-          color: '#d93025',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.75rem',
-          padding: '0.65rem 1rem',
-          border: '1px solid rgba(217, 48, 37, 0.15)',
+          color: '#e27d7d',
+          fontSize: '0.8rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '0.5rem 0.75rem',
+          background: 'rgba(226, 125, 125, 0.05)',
+          border: '1px solid rgba(226, 125, 125, 0.15)',
           borderRadius: '8px',
-          background: 'rgba(217, 48, 37, 0.03)'
+          animation: 'fadeIn 0.2s ease both'
         }}>
-          Error: {validationError}
+          <AlertTriangle size={14} style={{ color: '#e27d7d', flexShrink: 0 }} />
+          <span>{validationError}</span>
         </div>
       )}
 
       {/* Submit Button */}
       <button
         type="submit"
-        className="glass-btn glass-btn-primary"
+        className={`glass-btn ${isFormComplete ? 'glass-btn-primary' : ''}`}
         style={{
           width: '100%',
           padding: '0.9rem',
-          fontSize: '0.95rem'
+          fontSize: '0.95rem',
+          background: isFormComplete ? 'var(--accent-moss)' : 'rgba(255, 255, 255, 0.05)',
+          color: isFormComplete ? '#ffffff' : 'var(--text-secondary)',
+          border: isFormComplete ? '1px solid rgba(72, 178, 124, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: isFormComplete ? '0 4px 14px rgba(72, 178, 124, 0.25)' : 'none',
+          cursor: 'pointer',
+          opacity: isFormComplete ? 1 : 0.7,
+          transition: 'all 0.2s ease'
         }}
       >
         <Compass size={16} />
