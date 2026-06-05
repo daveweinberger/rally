@@ -240,7 +240,6 @@ function App() {
           activity={selectedActivity}
           onClose={() => setSelectedActivity(null)}
           generalAttribution={groundingMetadata}
-          constraints={activeConstraints}
         />
       )}
 

@@ -144,8 +144,13 @@ export async function getRecommendations(constraints, startWeather) {
     console.warn("GEMINI_API_KEY is not set or placeholder. Returning mock data.");
     const isSeattle = (constraints.startLocation || '').toLowerCase().includes('seattle') || 
                       (constraints.startLocation || '').toLowerCase().includes('wa');
+    const baseMock = isSeattle ? SEATTLE_MOCK : GENERIC_MOCK(constraints.startLocation || 'Your Location');
+    const mockedData = {
+      ...baseMock,
+      activities: filterActivitiesByExperienceLevel(baseMock.activities || [], constraints.experienceLevel)
+    };
     return {
-      data: isSeattle ? SEATTLE_MOCK : GENERIC_MOCK(constraints.startLocation || 'Your Location'),
+      data: mockedData,
       groundingMetadata: {
         searchEntryPoint: {
           renderedContent: "<a href='https://www.google.com/search?q=hiking+near+seattle' target='_blank'>Search Google for Hiking near Seattle</a>"
@@ -216,7 +221,10 @@ ${schemaString}
         cleanText = cleanText.substring(0, cleanText.length - 3);
       }
       cleanText = cleanText.trim();
-      parsedData = stripCitations(JSON.parse(cleanText));
+      parsedData = stripCitations(JSON.parse(cleanJsonString(cleanText)));
+      if (parsedData.activities) {
+        parsedData.activities = filterActivitiesByExperienceLevel(parsedData.activities, constraints.experienceLevel);
+      }
     } catch (parseErr) {
       console.error("Failed to parse Gemini JSON output. Raw output:", text);
       throw new Error("AI output was not in the expected JSON format.", { cause: parseErr });
@@ -240,7 +248,7 @@ ${schemaString}
  * @param {function} onChunk - Callback for streaming chunks
  * @returns {Promise<object>} - Returns final accumulated response with grounding metadata
  */
-export async function getRefinementStream(history, newMessage) {
+export async function getRefinementStream(history, newMessage, constraints) {
   const ai = getGenAIClient();
 
   const contents = [];
@@ -264,7 +272,7 @@ export async function getRefinementStream(history, newMessage) {
 
   if (!ai) {
     console.warn("GEMINI_API_KEY is not set or placeholder. Returning mock chat refinement JSON.");
-    return {
+    const baseMock = {
       chatResponse: "I have updated your recommendations to focus on Franklin Falls as a closer alternative.",
       activities: [
         {
@@ -299,6 +307,10 @@ export async function getRefinementStream(history, newMessage) {
         searchEntryPoint: null,
         groundingChunks: []
       }
+    };
+    return {
+      ...baseMock,
+      activities: filterActivitiesByExperienceLevel(baseMock.activities, constraints?.experienceLevel)
     };
   }
 
@@ -353,7 +365,7 @@ IMPORTANT RULES:
         cleanText = cleanText.substring(0, cleanText.length - 3);
       }
       cleanText = cleanText.trim();
-      parsedData = JSON.parse(cleanText);
+      parsedData = JSON.parse(cleanJsonString(cleanText));
     } catch (parseErr) {
       console.error("Failed to parse Gemini JSON refinement output. Raw output:", text);
       throw new Error("AI output was not in the expected JSON format.", { cause: parseErr });
@@ -361,7 +373,7 @@ IMPORTANT RULES:
 
     return {
       chatResponse: parsedData.chatResponse,
-      activities: parsedData.activities || [],
+      activities: filterActivitiesByExperienceLevel(parsedData.activities || [], constraints?.experienceLevel),
       generalExplanation: parsedData.generalExplanation || '',
       groundingMetadata: groundingMetadata
     };
@@ -388,4 +400,84 @@ function stripCitations(obj) {
     return cleaned;
   }
   return obj;
+}
+
+/**
+ * Filters and prioritizes activities by experience level.
+ * - Under no circumstances allows activities with difficulty > requested experience level.
+ * - Prioritizes activities with difficulty matching requested experience level.
+ * - Allows lower difficulty activities ONLY if no matching activities are available.
+ */
+export function filterActivitiesByExperienceLevel(activities, requestedLevel) {
+  if (!activities || !Array.isArray(activities)) return [];
+  if (!requestedLevel || typeof requestedLevel !== 'string') return activities;
+
+  const DIFFICULTY_LEVELS = {
+    'beginner': 1,
+    'intermediate': 2,
+    'advanced': 3,
+    'expert': 4
+  };
+
+  const reqVal = DIFFICULTY_LEVELS[requestedLevel.toLowerCase()];
+  if (!reqVal) return activities; // Unknown level, return unfiltered
+
+  // 1. Filter out activities higher than the requested level
+  const allowed = activities.filter(act => {
+    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
+    if (!actVal) return true; // Keep unknown difficulties
+    return actVal <= reqVal;
+  });
+
+  // 2. Prioritize exact matches
+  const exactMatches = allowed.filter(act => {
+    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
+    return actVal === reqVal;
+  });
+
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  // 3. Fallback to lower difficulties only if no exact matches exist
+  return allowed;
+}
+
+/**
+ * Clean control characters (like raw newlines, carriage returns, tabs) inside string literals in a JSON string.
+ * This prevents SyntaxErrors when parsing LLM outputs containing raw newlines.
+ */
+export function cleanJsonString(jsonStr) {
+  if (typeof jsonStr !== 'string') return jsonStr;
+  
+  let inString = false;
+  let escaped = false;
+  let out = "";
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+    if (char === '"' && !escaped) {
+      inString = !inString;
+    }
+    
+    if (inString) {
+      if (char === '\n') {
+        out += '\\n';
+      } else if (char === '\r') {
+        out += '\\r';
+      } else if (char === '\t') {
+        out += '\\t';
+      } else {
+        out += char;
+      }
+    } else {
+      out += char;
+    }
+    
+    if (char === '\\' && !escaped) {
+      escaped = true;
+    } else {
+      escaped = false;
+    }
+  }
+  return out;
 }

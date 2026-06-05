@@ -169,7 +169,7 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
   console.log("Starting refineAdventure chat refinement. Message:", message);
 
   try {
-    const streamResult = await getRefinementStream(history, message);
+    const streamResult = await getRefinementStream(history, message, constraints);
     
     let enrichedActivities = [];
     if (streamResult.activities && streamResult.activities.length > 0) {

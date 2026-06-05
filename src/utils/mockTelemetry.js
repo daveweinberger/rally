@@ -211,7 +211,11 @@ export function getMockRecommendations(constraints) {
     };
   }
 
-  return isSeattle ? SEATTLE_MOCK : GENERIC_MOCK(constraints.startLocation || 'Your Location');
+  const baseMock = isSeattle ? SEATTLE_MOCK : GENERIC_MOCK(constraints.startLocation || 'Your Location');
+  return {
+    ...baseMock,
+    results: filterActivitiesByExperienceLevel(baseMock.results || [], constraints.experienceLevel)
+  };
 }
 
 export async function simulateMockRefinementStream(onChunk) {
@@ -272,4 +276,42 @@ export async function simulateMockRefinementStream(onChunk) {
       ]
     }
   };
+}
+
+/**
+ * Filters and prioritizes activities by experience level.
+ * - Under no circumstances allows activities with difficulty > requested experience level.
+ * - Prioritizes activities with difficulty matching requested experience level.
+ * - Allows lower difficulty activities ONLY if no matching activities are available.
+ */
+function filterActivitiesByExperienceLevel(activities, requestedLevel) {
+  if (!activities || !Array.isArray(activities)) return [];
+  if (!requestedLevel) return activities;
+
+  const DIFFICULTY_LEVELS = {
+    'beginner': 1,
+    'intermediate': 2,
+    'advanced': 3,
+    'expert': 4
+  };
+
+  const reqVal = DIFFICULTY_LEVELS[requestedLevel.toLowerCase()];
+  if (!reqVal) return activities;
+
+  const allowed = activities.filter(act => {
+    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
+    if (!actVal) return true;
+    return actVal <= reqVal;
+  });
+
+  const exactMatches = allowed.filter(act => {
+    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
+    return actVal === reqVal;
+  });
+
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  return allowed;
 }

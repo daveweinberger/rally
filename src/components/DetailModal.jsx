@@ -32,11 +32,7 @@ function isAttributionMatch(activityName, activityPlaceId, chunkMaps) {
   return cleanA.includes(cleanC) || cleanC.includes(cleanA);
 }
 
-export default function DetailModal({ activity, onClose, generalAttribution, constraints }) {
-  const origin = constraints?.startCoords
-    ? `${constraints.startCoords.latitude},${constraints.startCoords.longitude}`
-    : (constraints?.startLocation || 'Seattle, WA');
-
+export default function DetailModal({ activity, onClose, generalAttribution }) {
   const [localItinerary, setLocalItinerary] = useState([]);
 
   useEffect(() => {
@@ -346,14 +342,14 @@ export default function DetailModal({ activity, onClose, generalAttribution, con
 
         {/* Directions CTA Button */}
         <a 
-          href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${activity.latitude},${activity.longitude}${activity.placeId ? `&destination_place_id=${activity.placeId}` : ''}`}
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.name ? `${activity.name}, ${activity.location}` : `${activity.latitude},${activity.longitude}`)}${activity.placeId && !cleanPlaceId(activity.placeId).startsWith('mock') ? `&query_place_id=${cleanPlaceId(activity.placeId)}` : ''}`}
           target="_blank"
           rel="noopener noreferrer"
           className="glass-btn glass-btn-primary"
           style={{ width: '100%', textDecoration: 'none', gap: '8px' }}
         >
           <Route size={16} />
-          <span>Get Driving Directions</span>
+          <span>Let's Go</span>
         </a>
       </div>
     </div>
