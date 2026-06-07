@@ -28,7 +28,7 @@ export const RESPONSE_SCHEMA = {
   properties: {
     activities: {
       type: "ARRAY",
-      description: "List of 2 to 3 ranked activity recommendations. Return an empty array if no matches exist for the requested activity types.",
+      description: "List of exactly 3 ranked activity recommendations. Return an empty array if no matches exist for the requested activity types.",
       items: {
         type: "OBJECT",
         properties: {
@@ -100,7 +100,7 @@ export const REFINEMENT_SCHEMA = {
     },
     activities: {
       type: "ARRAY",
-      description: "Optional. If the user's request requires updating, changing, or refining the recommended activities (e.g. asking for closer options, different locations, dog-friendly trails, or specific activities), return a list of 2 to 3 activity recommendations matching the original schema. Leave this empty or omit it if the user was just asking a question and does not want to change the active recommendations.",
+      description: "Optional. If the user's request requires updating, changing, or refining the recommended activities (e.g. asking for closer options, different locations, dog-friendly trails, or specific activities), return a list of exactly 3 activity recommendations matching the original schema. Leave this empty or omit it if the user was just asking a question and does not want to change the active recommendations.",
       items: RESPONSE_SCHEMA.properties.activities.items
     },
     generalExplanation: {

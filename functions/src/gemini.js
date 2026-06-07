@@ -175,7 +175,7 @@ export async function getRecommendations(constraints, startWeather) {
 
   const schemaString = JSON.stringify(RESPONSE_SCHEMA, null, 2);
   const prompt = `
-Recommend 3 to 4 outdoor activities matching these user constraints:${weatherInfo}
+Recommend exactly 3 outdoor activities matching these user constraints:${weatherInfo}
 - Starting Location: ${locationString}
 - Target Date for Adventure: ${constraints.targetDay || 'Today'} (Evaluate trail conditions, highway traffic, and weather forecast specifically for this target date)
 - Time Window: ${constraints.timeWindow}
@@ -320,7 +320,7 @@ Please respond with a JSON object matching this schema:
 ${schemaString}
 
 IMPORTANT RULES:
-1. If the user's request changes the recommendations (e.g. they ask for a different area, closer options, easier trails, or a specific activity), you MUST generate a new set of 2 to 3 outdoor activity recommendations in the "activities" array. Ensure these activities fit all of their original constraints plus the new refinement.
+1. If the user's request changes the recommendations (e.g. they ask for a different area, closer options, easier trails, or a specific activity), you MUST generate a new set of exactly 3 outdoor activity recommendations in the "activities" array. Ensure these activities fit all of their original constraints plus the new refinement.
 2. In the "chatResponse" field, write a brief, friendly response (strictly 2 to 3 sentences) confirming that the recommendations have been updated and summarizing the updates.
 3. If the user's request does NOT change the recommendations (e.g. they just asked a general question or clarified something), do NOT include the "activities" field (or leave it empty/null), and write your answer to their question in "chatResponse".
 4. You must output ONLY a valid JSON object matching the schema.
@@ -526,6 +526,8 @@ Verify current conditions such as trail closures, snow level, blowdowns, stream 
       contents: prompt,
       config: {
         systemInstruction: TIPS_SYSTEM_PROMPT,
+        responseMimeType: 'application/json',
+        responseSchema: TIPS_SCHEMA,
         tools: [
           { googleSearch: {} }
         ]

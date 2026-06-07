@@ -409,7 +409,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                             {tipText}
                           </p>
                         )}
-                        {(tipSource || tipDate) && (
+                        {isVerbatim && (tipSource || tipDate) && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                             {tipSource && (
                               <>
