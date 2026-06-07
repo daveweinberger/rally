@@ -16,8 +16,7 @@ CRITICAL RULES:
 4. GROUNDING AND DATA:
    - Use Google Maps Grounding to verify trailhead coordinates, place names, and IDs.
    - TRAILHEAD DIRECTIONS: When using Google Maps Grounding to retrieve names, placeIds, and coordinates for outdoor activities, you MUST specifically target the TRAILHEAD (e.g., "Storm King Trailhead", "Snow Lake Trailhead", "Mailbox Peak Trailhead") rather than the trail body itself, a peak, or a lake center. Ensure coordinates and placeIds represent the vehicle-accessible parking lot or entrance where the hike or activity begins. The returned "name" of the activity should also reflect the trailhead (e.g., "Storm King Trailhead").
-   - To make recentTips as useful and fresh as possible, you must search Google for the latest trip reports, trail conditions, or seasonal updates. To minimize latency, you MUST perform AT MOST 1 single search query in total (e.g., search for regional trip reports like "Snoqualmie Pass WTA trail reports June 2026"). Do NOT perform individual search queries for each trailhead, town, or trail. Rely on your pre-trained knowledge for specific trail facts and characteristics. Do NOT search Google for weather conditions.
-   - STRICT RECENCY: For the "recentTips" field, you MUST ONLY include highly recent condition reports or tips from the current month/year (i.e. June 2026). Absolutely NEVER recommend or list tips, reports, or articles from previous years (e.g. 2022, 2023, 2024, 2025). If no recent reports from the current month/year are found in the search results, you must rely on typical seasonal patterns for the current month and label the date as "Seasonal average" or "General guidance", rather than using an outdated specific date from a past year.
+   - DEFAULT RECENT TIPS: For the "recentTips" field, since you do not have active web search enabled during this recommendation phase, you MUST rely on typical seasonal patterns for the current month (i.e., June) and your pre-trained knowledge. Formulate 2-3 useful seasonal tips (e.g. typical trail conditions, parking availability, standard gear needed) and label the date as "Seasonal average" or "General guidance" and source as "Seasonal average" or "General guidance", and keep the link empty or generic (e.g., "https://www.wta.org").
    - You will be provided with the live starting location weather forecast directly in the prompt constraints.
    - Do NOT mention any system limitations, missing tools, or API geocoding issues to the user. Present all recommendations confidently using the provided data.
 5. TONE:
@@ -110,6 +109,37 @@ export const REFINEMENT_SCHEMA = {
     }
   },
   required: ["chatResponse"]
+};
+
+export const TIPS_SYSTEM_PROMPT = `You are "Rally", an expert local adventure guide.
+Your task is to fetch the absolute latest trip reports, trail conditions, or seasonal updates for a specific outdoor trailhead or activity location.
+
+CRITICAL RULES:
+1. GROUNDING: Use Google Search Grounding to find the latest condition reports, reviews, or news for the target trailhead or area.
+2. STRICT RECENCY: You MUST ONLY include highly recent condition reports or tips from the current month/year (i.e. June 2026). Absolutely NEVER recommend or list tips, reports, or articles from previous years (e.g. 2022, 2023, 2024, 2025). If no recent reports from the current month/year are found in the search results, you must rely on typical seasonal patterns for the current month and label the date as "Seasonal average" or "General guidance".
+3. DETAILS: Extract specific, actionable tips (e.g., snow level, mud, blowdowns, stream crossing levels, parking lot fills, closures).
+4. Do not mention any system limitations, missing tools, or API geocoding issues to the user. Present all findings confidently.
+`;
+
+export const TIPS_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    recentTips: {
+      type: "ARRAY",
+      description: "3 to 4 short, highly recent tips or condition reports from the last week or current month/year (i.e. June 2026). Ensure each tip contains actionable detail.",
+      items: {
+        type: "OBJECT",
+        properties: {
+          text: { type: "STRING", description: "The content/text of the tip or report (e.g., 'Fryingpan Creek crossing can be high and fast in the mornings; exercise caution.')" },
+          date: { type: "STRING", description: "When the report was posted or observed, expressing the recency as specifically as possible (e.g. '3 hours ago', 'yesterday', '2 days ago', 'May 28')" },
+          source: { type: "STRING", description: "Name of the source website (e.g. 'WTA', 'AllTrails', 'NPS')" },
+          link: { type: "STRING", description: "The specific URL link to the original report or trail condition page on that platform." }
+        },
+        required: ["text", "date", "source", "link"]
+      }
+    }
+  },
+  required: ["recentTips"]
 };
 
 

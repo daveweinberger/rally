@@ -58,19 +58,22 @@ export async function getCache(key) {
  * @param {any} value 
  * @param {number} ttlSeconds 
  */
-export async function setCache(key, value, ttlSeconds) {
+export function setCache(key, value, ttlSeconds) {
   // Save to L1 memory cache
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
   memoryCache.set(key, { value, expiresAt });
 
   try {
     const docRef = db.collection(COLLECTION_NAME).doc(key);
-    await docRef.set({
+    // Fire-and-forget write to Firestore
+    docRef.set({
       value,
       expiresAt: Timestamp.fromDate(expiresAt),
       createdAt: Timestamp.now()
+    }).catch((error) => {
+      console.error(`Cache write error for key ${key}:`, error);
     });
   } catch (error) {
-    console.error(`Cache write error for key ${key}:`, error);
+    console.error(`Cache setup error for key ${key}:`, error);
   }
 }

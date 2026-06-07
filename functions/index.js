@@ -1,12 +1,42 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { getRecommendations, getRefinementStream } from './src/gemini.js';
+import { getRecommendations, getRefinementStream, getRecentTips } from './src/gemini.js';
 import { computeRoute } from './src/routes.js';
 import { fetchWeather } from './src/weather.js';
 
 // Initialize firebase admin if not done already
 if (getApps().length === 0) {
   initializeApp();
+}
+
+/**
+ * Resolves routing data for an activity using placeId or coordinates, falling back to name+location if needed.
+ */
+async function resolveRouteData(origin, activity) {
+  let destination;
+  if (activity.placeId) {
+    destination = activity.placeId;
+  } else if (activity.latitude && activity.longitude) {
+    destination = {
+      latitude: activity.latitude,
+      longitude: activity.longitude
+    };
+  } else {
+    destination = `${activity.name}, ${activity.location}`;
+  }
+
+  const firstAttempt = await computeRoute(origin, destination);
+  
+  if (
+    firstAttempt.durationText && 
+    firstAttempt.durationText.includes('fallback') && 
+    (activity.placeId || (activity.latitude && activity.longitude))
+  ) {
+    console.log(`Routes API: Primary routing failed for ${activity.name}. Retrying with: "${activity.name}, ${activity.location}"`);
+    return await computeRoute(origin, `${activity.name}, ${activity.location}`);
+  }
+  
+  return firstAttempt;
 }
 
 /**
@@ -33,7 +63,6 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
   try {
     // Stage 1: Constraint Analysis
     sendStatus('analyzing', 'Analyzing your constraints...');
-    await new Promise(r => setTimeout(r, 600)); // aesthetic pacing
 
     // Stage 2: Gemini API Call
     sendStatus('querying', 'Querying Gemini with Google Maps Grounding...');
@@ -55,46 +84,12 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
     
     const enrichedPromises = activities.map(async (activity) => {
       const origin = constraints.startCoords || constraints.startLocation;
-      let routeData;
       
       const weatherPromise = activity.latitude && activity.longitude 
         ? fetchWeather(activity.latitude, activity.longitude, constraints.targetDay || 'Today')
         : Promise.resolve(null);
         
-      if (activity.latitude && activity.longitude) {
-        // Try coordinates first
-        const coordsDest = {
-          latitude: activity.latitude,
-          longitude: activity.longitude
-        };
-        const firstAttempt = await computeRoute(origin, coordsDest);
-        
-        if (firstAttempt.durationText && firstAttempt.durationText.includes('fallback')) {
-          console.log(`Routes API: Coordinate-based routing failed for ${activity.name}. Retrying with: "${activity.name}, ${activity.location}"`);
-          const secondAttempt = await computeRoute(origin, `${activity.name}, ${activity.location}`);
-          
-          if (secondAttempt.durationText && secondAttempt.durationText.includes('fallback')) {
-            console.log(`Routes API: Name+Location routing failed for ${activity.name}. Retrying with name only: "${activity.name}"`);
-            const thirdAttempt = await computeRoute(origin, activity.name);
-            routeData = thirdAttempt;
-          } else {
-            routeData = secondAttempt;
-          }
-        } else {
-          routeData = firstAttempt;
-        }
-      } else {
-        // No coordinates: try placeId or name + location
-        const textDest = activity.placeId || `${activity.name}, ${activity.location}`;
-        const attempt = await computeRoute(origin, textDest);
-        
-        if (attempt.durationText && attempt.durationText.includes('fallback') && activity.name) {
-          console.log(`Routes API: Text-based routing failed for ${activity.name}. Retrying with name only.`);
-          routeData = await computeRoute(origin, activity.name);
-        } else {
-          routeData = attempt;
-        }
-      }
+      const routeData = await resolveRouteData(origin, activity);
       
       const weatherData = await weatherPromise;
       
@@ -177,38 +172,11 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
       const targetDay = constraints?.targetDay || 'Today';
 
       const enrichedPromises = streamResult.activities.map(async (activity) => {
-        let routeData;
         const weatherPromise = activity.latitude && activity.longitude 
           ? fetchWeather(activity.latitude, activity.longitude, targetDay)
           : Promise.resolve(null);
           
-        if (activity.latitude && activity.longitude) {
-          const coordsDest = {
-            latitude: activity.latitude,
-            longitude: activity.longitude
-          };
-          const firstAttempt = await computeRoute(origin, coordsDest);
-          
-          if (firstAttempt.durationText && firstAttempt.durationText.includes('fallback')) {
-            console.log(`Routes API (Refinement): Coordinate-based routing failed for ${activity.name}. Retrying with name+location.`);
-            const secondAttempt = await computeRoute(origin, `${activity.name}, ${activity.location}`);
-            if (secondAttempt.durationText && secondAttempt.durationText.includes('fallback')) {
-              routeData = await computeRoute(origin, activity.name);
-            } else {
-              routeData = secondAttempt;
-            }
-          } else {
-            routeData = firstAttempt;
-          }
-        } else {
-          const textDest = activity.placeId || `${activity.name}, ${activity.location}`;
-          const attempt = await computeRoute(origin, textDest);
-          if (attempt.durationText && attempt.durationText.includes('fallback') && activity.name) {
-            routeData = await computeRoute(origin, activity.name);
-          } else {
-            routeData = attempt;
-          }
-        }
+        const routeData = await resolveRouteData(origin, activity);
         
         const weatherData = await weatherPromise;
         
@@ -244,6 +212,22 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
 
   } catch (error) {
     console.error("Error in refineAdventure Cloud Function:", error);
+    throw error;
+  }
+});
+
+/**
+ * Cloud Function to fetch live recent tips/trail reports for a single activity.
+ */
+export const fetchRecentTips = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (request) => {
+  const { activityName, location, latitude, longitude } = request.data;
+  console.log(`Starting fetchRecentTips for: ${activityName} (${location})`);
+  
+  try {
+    const tipsResult = await getRecentTips(activityName, location, latitude, longitude);
+    return tipsResult;
+  } catch (error) {
+    console.error("Error in fetchRecentTips Cloud Function:", error);
     throw error;
   }
 });

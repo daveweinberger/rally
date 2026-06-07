@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X, MapPin, AlertTriangle, Route, ExternalLink } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Route, ExternalLink, RefreshCw } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../utils/firebase.js';
 import Attribution from './Attribution.jsx';
 
 const cleanPlaceId = (id) => id ? id.replace(/^places\//, '') : '';
@@ -32,16 +34,61 @@ function isAttributionMatch(activityName, activityPlaceId, chunkMaps) {
   return cleanA.includes(cleanC) || cleanC.includes(cleanA);
 }
 
-export default function DetailModal({ activity, onClose, generalAttribution }) {
+export default function DetailModal({ activity, onClose, generalAttribution, onUpdateActivity }) {
   const [localItinerary, setLocalItinerary] = useState([]);
+  const [localTips, setLocalTips] = useState([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
+  const [tipsFetched, setTipsFetched] = useState(false);
+  const [tipsError, setTipsError] = useState(null);
 
   useEffect(() => {
-    if (activity && activity.itinerary) {
-      setLocalItinerary(activity.itinerary);
+    if (activity) {
+      setLocalItinerary(activity.itinerary || []);
+      setLocalTips(activity.recentTips || []);
+      // If the tips were already fetched (e.g. have [Live] or are from the live endpoint), we can mark it
+      const hasLiveTips = (activity.recentTips || []).some(t => t.text && (t.text.includes('[Live') || t.text.includes('[Live Mock]')));
+      setTipsFetched(hasLiveTips);
+      setTipsError(null);
     } else {
       setLocalItinerary([]);
+      setLocalTips([]);
+      setTipsFetched(false);
+      setTipsError(null);
     }
   }, [activity]);
+
+  const handleFetchLiveTips = async () => {
+    if (tipsLoading || !activity) return;
+    setTipsLoading(true);
+    setTipsError(null);
+    try {
+      const fetchFn = httpsCallable(functions, 'fetchRecentTips');
+      const response = await fetchFn({
+        activityName: activity.name,
+        location: activity.location,
+        latitude: activity.latitude,
+        longitude: activity.longitude
+      });
+      if (response.data && response.data.recentTips) {
+        const freshTips = response.data.recentTips;
+        setLocalTips(freshTips);
+        setTipsFetched(true);
+        if (onUpdateActivity) {
+          onUpdateActivity({
+            ...activity,
+            recentTips: freshTips
+          });
+        }
+      } else {
+        throw new Error("No recent tips returned.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch live tips:", err);
+      setTipsError("Failed to fetch live reports. Please try again.");
+    } finally {
+      setTipsLoading(false);
+    }
+  };
 
   // Prevent body scrolling when modal is open
   useEffect(() => {
@@ -236,91 +283,169 @@ export default function DetailModal({ activity, onClose, generalAttribution }) {
           )}
 
           {/* Conditions reports */}
-          {activity.recentTips && activity.recentTips.length > 0 && (
+          {localTips && localTips.length > 0 && (
             <div className="flex-col gap-sm">
-              <h3 style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                Recent Reports & Tips
-              </h3>
-              <div className="flex-col gap-sm" style={{ gap: '10px' }}>
-                {activity.recentTips.map((tip, idx) => {
-                  const tipText = typeof tip === 'object' ? tip.text : tip;
-                  const tipDate = typeof tip === 'object' ? tip.date : null;
-                  const tipSource = typeof tip === 'object' ? tip.source : null;
-                  const tipLink = typeof tip === 'object' ? tip.link : null;
-
-                  const isVerbatim = (() => {
-                    if (!tipSource) return false;
-                    const src = tipSource.toLowerCase();
-                    const dt = (tipDate || '').toLowerCase();
-                    if (src.includes('general guidance') || src.includes('seasonal patterns') || src.includes('seasonal average')) return false;
-                    if (dt.includes('general guidance') || dt.includes('seasonal patterns') || dt.includes('seasonal average')) return false;
-                    return true;
-                  })();
-
-                  return (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <h3 style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>
+                  Recent Reports & Tips
+                </h3>
+                <button
+                  onClick={handleFetchLiveTips}
+                  disabled={tipsLoading}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(72, 178, 124, 0.4)',
+                    borderRadius: '16px',
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    color: 'var(--accent-moss)',
+                    cursor: tipsLoading ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                    opacity: tipsLoading ? 0.6 : 1,
+                    outline: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!tipsLoading) {
+                      e.currentTarget.style.background = 'rgba(72, 178, 124, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.8)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.4)';
+                  }}
+                >
+                  <RefreshCw 
+                    size={10} 
+                    style={{ 
+                      animation: tipsLoading ? 'spin 1s linear infinite' : 'none' 
+                    }} 
+                  />
+                  <span>{tipsLoading ? 'Updating...' : tipsFetched ? 'Update Live' : 'Get Live Reports'}</span>
+                </button>
+              </div>
+              
+              {tipsLoading ? (
+                <div className="flex-col gap-sm" style={{ gap: '10px' }}>
+                  {[1, 2, 3].map((i) => (
                     <div 
-                      key={idx} 
-                      style={{ 
+                      key={i} 
+                      className="pulse"
+                      style={{
                         background: 'rgba(255, 255, 255, 0.02)',
                         border: '1px solid rgba(255, 255, 255, 0.05)',
                         borderRadius: '10px',
                         padding: '0.85rem 1rem',
-                        fontSize: '0.82rem',
-                        lineHeight: 1.45,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '6px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                        transition: 'border-color 0.2s',
+                        gap: '8px',
+                        height: '75px',
+                        boxSizing: 'border-box'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.2)'}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
                     >
-                      {isVerbatim ? (
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                          "{tipText}"
-                        </p>
-                      ) : (
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'normal' }}>
-                          {tipText}
-                        </p>
-                      )}
-                      {(tipSource || tipDate) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          {tipSource && (
-                            <>
-                              {tipLink ? (
-                                <a 
-                                  href={tipLink} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  style={{ 
-                                    color: 'var(--accent-moss)', 
-                                    textDecoration: 'none', 
-                                    fontWeight: 600,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                                >
-                                  <span>{tipSource}</span>
-                                  <ExternalLink size={10} style={{ opacity: 0.8 }} />
-                                </a>
-                              ) : (
-                                <span style={{ fontWeight: 600 }}>{tipSource}</span>
-                              )}
-                            </>
-                          )}
-                          {tipSource && tipDate && <span>•</span>}
-                          {tipDate && <span>{tipDate}</span>}
-                        </div>
-                      )}
+                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '85%' }}></div>
+                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '60%' }}></div>
+                      <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', width: '30%', marginTop: '4px' }}></div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : tipsError ? (
+                <div style={{ 
+                  fontSize: '0.82rem', 
+                  color: '#f87171', 
+                  background: 'rgba(248, 113, 113, 0.05)', 
+                  border: '1px solid rgba(248, 113, 113, 0.15)', 
+                  borderRadius: '10px', 
+                  padding: '0.85rem 1rem',
+                  textAlign: 'center' 
+                }}>
+                  {tipsError}
+                </div>
+              ) : (
+                <div className="flex-col gap-sm" style={{ gap: '10px' }}>
+                  {localTips.map((tip, idx) => {
+                    const tipText = typeof tip === 'object' ? tip.text : tip;
+                    const tipDate = typeof tip === 'object' ? tip.date : null;
+                    const tipSource = typeof tip === 'object' ? tip.source : null;
+                    const tipLink = typeof tip === 'object' ? tip.link : null;
+
+                    const isVerbatim = (() => {
+                      if (!tipSource) return false;
+                      const src = tipSource.toLowerCase();
+                      const dt = (tipDate || '').toLowerCase();
+                      if (src.includes('general guidance') || src.includes('seasonal patterns') || src.includes('seasonal average')) return false;
+                      if (dt.includes('general guidance') || dt.includes('seasonal patterns') || dt.includes('seasonal average')) return false;
+                      return true;
+                    })();
+
+                    return (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: '10px',
+                          padding: '0.85rem 1rem',
+                          fontSize: '0.82rem',
+                          lineHeight: 1.45,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.2)'}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
+                      >
+                        {isVerbatim ? (
+                          <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            "{tipText}"
+                          </p>
+                        ) : (
+                          <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'normal' }}>
+                            {tipText}
+                          </p>
+                        )}
+                        {(tipSource || tipDate) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {tipSource && (
+                              <>
+                                {tipLink ? (
+                                  <a 
+                                    href={tipLink} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ 
+                                      color: 'var(--accent-moss)', 
+                                      textDecoration: 'none', 
+                                      fontWeight: 600,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                  >
+                                    <span>{tipSource}</span>
+                                    <ExternalLink size={10} style={{ opacity: 0.8 }} />
+                                  </a>
+                                ) : (
+                                  <span style={{ fontWeight: 600 }}>{tipSource}</span>
+                                )}
+                              </>
+                            )}
+                            {tipSource && tipDate && <span>•</span>}
+                            {tipDate && <span>{tipDate}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -352,6 +477,19 @@ export default function DetailModal({ activity, onClose, generalAttribution }) {
           <span>Let's Go</span>
         </a>
       </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+        .pulse {
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+      `}} />
     </div>
   );
 }

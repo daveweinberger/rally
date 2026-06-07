@@ -240,6 +240,10 @@ function App() {
           activity={selectedActivity}
           onClose={() => setSelectedActivity(null)}
           generalAttribution={groundingMetadata}
+          onUpdateActivity={(updatedAct) => {
+            setSelectedActivity(updatedAct);
+            setResults(prev => prev.map(act => act.name === updatedAct.name ? updatedAct : act));
+          }}
         />
       )}
 

@@ -1,6 +1,6 @@
 /* global process */
 import { GoogleGenAI } from '@google/genai';
-import { SYSTEM_PROMPT, RESPONSE_SCHEMA, REFINEMENT_SCHEMA } from './systemPrompt.js';
+import { SYSTEM_PROMPT, RESPONSE_SCHEMA, REFINEMENT_SCHEMA, TIPS_SYSTEM_PROMPT, TIPS_SCHEMA } from './systemPrompt.js';
 
 // Helper to initialize GoogleGenAI client
 function getGenAIClient() {
@@ -190,13 +190,12 @@ ${schemaString}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [
-          { googleMaps: {} },
-          { googleSearch: {} }
+          { googleMaps: {} }
         ]
       }
     });
@@ -334,13 +333,12 @@ IMPORTANT RULES:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: contents,
       config: {
         systemInstruction: SYSTEM_PROMPT + "\n\nThis is the chat refinement phase. You must return a JSON object matching the refinement schema.",
         tools: [
-          { googleMaps: {} },
-          { googleSearch: {} }
+          { googleMaps: {} }
         ]
       }
     });
@@ -480,4 +478,87 @@ export function cleanJsonString(jsonStr) {
     }
   }
   return out;
+}
+
+/**
+ * Fetches recent live tips for a single activity using Google Search Grounding.
+ * @param {string} activityName 
+ * @param {string} location 
+ * @param {number} latitude 
+ * @param {number} longitude 
+ * @returns {Promise<object>}
+ */
+export async function getRecentTips(activityName, location, latitude, longitude) {
+  const ai = getGenAIClient();
+
+  if (!ai) {
+    console.warn("GEMINI_API_KEY is not set or placeholder. Returning mock tips.");
+    return {
+      recentTips: [
+        {
+          text: `[Live Mock] Fresh trail report for ${activityName}: Trail is clear, minor mud near the middle section, parking lot has plenty of spaces.`,
+          date: "3 hours ago",
+          source: "WTA",
+          link: "https://www.wta.org"
+        },
+        {
+          text: `[Live Mock] Wildflowers are in full bloom! Bring bug spray for the upper meadows.`,
+          date: "yesterday",
+          source: "AllTrails",
+          link: "https://www.alltrails.com"
+        }
+      ]
+    };
+  }
+
+  const prompt = `
+Fetch recent condition reports, reviews, and trail tips for:
+- Activity Name: ${activityName}
+- Location: ${location}
+- Coordinates: ${latitude}, ${longitude}
+
+Verify current conditions such as trail closures, snow level, blowdowns, stream crossings, mud, or parking details. Search for recent reports specifically from the current month (i.e. June 2026).
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: prompt,
+      config: {
+        systemInstruction: TIPS_SYSTEM_PROMPT,
+        tools: [
+          { googleSearch: {} }
+        ]
+      }
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new Error("No text returned from Gemini recent tips query.");
+    }
+
+    let parsedData;
+    try {
+      let cleanText = text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.substring(7);
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.substring(3);
+      }
+      if (cleanText.endsWith('```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
+      }
+      cleanText = cleanText.trim();
+      parsedData = stripCitations(JSON.parse(cleanJsonString(cleanText)));
+    } catch (parseErr) {
+      console.error("Failed to parse Gemini JSON tips output. Raw output:", text);
+      throw new Error("Tips output was not in the expected JSON format.", { cause: parseErr });
+    }
+
+    return parsedData;
+
+  } catch (error) {
+    console.error("Failed to get recent tips from Gemini:", error);
+    throw error;
+  }
 }
