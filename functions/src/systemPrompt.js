@@ -55,12 +55,12 @@ export const RESPONSE_SCHEMA = {
           },
           itinerary: {
             type: "ARRAY",
-            description: "Suggested chronological timeline of the day based on the time window. The timeline MUST start with departing the starting location and end with the return/arrival back at the starting location, factoring in expected drive times and typical traffic delays at those hours (e.g. weekend afternoon return traffic).",
+            description: "Suggested chronological timeline of the day based on the time window. The timeline MUST start with departing the specific starting location (e.g. 'Depart Seattle, WA') and end with the return/arrival back at that same starting location (e.g. 'Arrive back at Seattle, WA'), factoring in expected drive times and typical traffic delays at those hours (e.g. weekend afternoon return traffic).",
             items: {
               type: "OBJECT",
               properties: {
                 time: { type: "STRING", description: "Suggested time (e.g. '07:30')" },
-                action: { type: "STRING", description: "Description of activity or travel leg (e.g. 'Depart starting location' or 'Arrive back at starting location')" }
+                action: { type: "STRING", description: "Description of activity or travel leg (e.g. 'Depart [Starting Location]' or 'Arrive back at [Starting Location]')" }
               },
               required: ["time", "action"]
             }

@@ -4,7 +4,8 @@ import InputPanel from './InputPanel.jsx';
 
 export default function ParameterBar({ constraints, onSubmit, isLoading }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [focusField, setFocusField] = useState(null);
+  const [activeField, setActiveField] = useState(null);
+  const [autoFocusField, setAutoFocusField] = useState(null);
 
   if (!constraints) return null;
 
@@ -19,18 +20,25 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
   } = constraints;
 
   const handlePillClick = (field) => {
-    if (isExpanded && focusField === field) {
+    if (isExpanded && activeField === field) {
       setIsExpanded(false);
-      setFocusField(null);
+      setActiveField(null);
+      setAutoFocusField(null);
     } else {
-      setFocusField(field);
+      setActiveField(field);
+      setAutoFocusField(field);
       setIsExpanded(true);
     }
   };
 
   const handleEditAllClick = () => {
-    setIsExpanded(!isExpanded);
-    setFocusField(null);
+    if (isExpanded && activeField === null) {
+      setIsExpanded(false);
+    } else {
+      setIsExpanded(true);
+      setActiveField(null);
+      setAutoFocusField(null);
+    }
   };
 
   const handleFormSubmit = (newConstraints) => {
@@ -44,6 +52,19 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
     return `${list.slice(0, 2).join(', ')} + ${list.length - 2} more`;
   };
 
+  const getPanelTitle = () => {
+    switch (activeField) {
+      case 'location': return 'Modify Starting Point';
+      case 'date': return 'Modify Adventure Date';
+      case 'activities': return 'Modify Preferred Activities';
+      case 'drive': return 'Modify Driving Limit';
+      case 'duration': return 'Modify Duration';
+      case 'experience': return 'Modify Experience Level';
+      case 'notes': return 'Modify Notes & Requests';
+      default: return 'Quick Modify Parameters';
+    }
+  };
+
   return (
     <div className="parameter-bar-container">
       <div className="parameter-pills-row">
@@ -51,7 +72,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('location')}
-          className={`parameter-pill ${isExpanded && focusField === 'location' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'location' ? 'active' : ''}`}
           title="Click to edit starting point"
         >
           <MapPin size={13} />
@@ -62,7 +83,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('date')}
-          className={`parameter-pill ${isExpanded && focusField === 'date' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'date' ? 'active' : ''}`}
           title="Click to change date"
         >
           <Calendar size={13} />
@@ -73,7 +94,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('activities')}
-          className={`parameter-pill ${isExpanded && focusField === 'activities' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'activities' ? 'active' : ''}`}
           title="Click to edit preferred activities"
         >
           <Compass size={13} />
@@ -84,7 +105,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('drive')}
-          className={`parameter-pill ${isExpanded && focusField === 'drive' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'drive' ? 'active' : ''}`}
           title="Click to adjust drive time limit"
         >
           <Car size={13} />
@@ -95,7 +116,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('duration')}
-          className={`parameter-pill ${isExpanded && focusField === 'duration' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'duration' ? 'active' : ''}`}
           title="Click to adjust duration"
         >
           <Clock size={13} />
@@ -106,7 +127,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <button
           type="button"
           onClick={() => handlePillClick('experience')}
-          className={`parameter-pill ${isExpanded && focusField === 'experience' ? 'active' : ''}`}
+          className={`parameter-pill ${isExpanded && activeField === 'experience' ? 'active' : ''}`}
           title="Click to change experience level"
         >
           <Sliders size={13} />
@@ -118,7 +139,7 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
           <button
             type="button"
             onClick={() => handlePillClick('notes')}
-            className={`parameter-pill ${isExpanded && focusField === 'notes' ? 'active' : ''}`}
+            className={`parameter-pill ${isExpanded && activeField === 'notes' ? 'active' : ''}`}
             title="Click to edit special requests/notes"
           >
             <MessageSquare size={13} />
@@ -145,22 +166,50 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
         <div className="glass-card parameter-edit-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-              Quick Modify Parameters
+              {getPanelTitle()}
             </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Changes will recalculate matching adventures
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {activeField && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveField(null);
+                    setAutoFocusField(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(72, 178, 124, 0.3)',
+                    color: 'var(--accent-moss)',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(72, 178, 124, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  Show All Options
+                </button>
+              )}
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Changes will recalculate matching adventures
+              </span>
+            </div>
           </div>
 
           <InputPanel
             onSubmit={handleFormSubmit}
             initialConstraints={constraints}
-            autoFocusField={focusField}
-            onClearAutoFocus={() => setFocusField(null)}
+            visibleField={activeField}
+            autoFocusField={autoFocusField}
+            onClearAutoFocus={() => setAutoFocusField(null)}
             submitLabel="Update Search"
             onCancel={() => {
               setIsExpanded(false);
-              setFocusField(null);
+              setActiveField(null);
+              setAutoFocusField(null);
             }}
           />
         </div>

@@ -494,8 +494,9 @@ export const formatNominatimName = (item) => {
   return item.display_name.split(',').slice(0, 3).join(',').trim();
 };
 
-export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus, submitLabel, onCancel }) {
+export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus, submitLabel, onCancel, visibleField }) {
   const upcomingDays = getUpcomingDays();
+  const showAll = !visibleField;
   
   const [startLocation, setStartLocation] = useState(initialConstraints?.startLocation || 'Seattle, WA');
   const [startCoords, setStartCoords] = useState(initialConstraints?.startCoords || null);
@@ -773,237 +774,294 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
   return (
     <form onSubmit={handleFormSubmit} className="flex-col gap-lg" style={{ width: '100%' }}>
       {/* Starting Location */}
-      <div className="flex-col" ref={locationRef} style={{ position: 'relative' }}>
-        <label className="glass-label">
-          <span>Starting Point</span>
-          {startCoords && (
-            <span className="glass-label-badge">
-              {locationSource === 'gps' ? 'GPS Active' : locationSource === 'typeahead' ? 'Location Synced' : 'Coordinates Set'}
-            </span>
-          )}
-        </label>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Navigation size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-secondary)' }} />
-          <input
-            id="location-input"
-            type="text"
-            className="glass-input"
-            style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
-            placeholder="Enter city, trailhead, or use GPS"
-            value={startLocation}
-            onChange={(e) => handleLocationChange(e.target.value)}
-            onFocus={() => {
-              if (suggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={requestGeolocation}
-            disabled={isLocating}
-            style={{
-              position: 'absolute',
-              right: '10px',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: startCoords ? 'var(--accent-moss)' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '6px'
-            }}
-            title="Use current GPS location"
-          >
-            <Locate size={16} className={isLocating ? 'pulse-green' : ''} />
-          </button>
-        </div>
+      {(showAll || visibleField === 'location') && (
+        <div className="flex-col" ref={locationRef} style={{ position: 'relative' }}>
+          <label className="glass-label">
+            <span>Starting Point</span>
+            {startCoords && (
+              <span className="glass-label-badge">
+                {locationSource === 'gps' ? 'GPS Active' : locationSource === 'typeahead' ? 'Location Synced' : 'Coordinates Set'}
+              </span>
+            )}
+          </label>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Navigation size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-secondary)' }} />
+            <input
+              id="location-input"
+              type="text"
+              className="glass-input"
+              style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+              placeholder="Enter city, trailhead, or use GPS"
+              value={startLocation}
+              onChange={(e) => handleLocationChange(e.target.value)}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={requestGeolocation}
+              disabled={isLocating}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: startCoords ? 'var(--accent-moss)' : 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px'
+              }}
+              title="Use current GPS location"
+            >
+              <Locate size={16} className={isLocating ? 'pulse-green' : ''} />
+            </button>
+          </div>
 
-        {/* Typeahead Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div
-            className="custom-dropdown-menu"
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 6px)',
-              left: 0,
-              right: 0,
-              background: 'rgba(28, 42, 35, 0.98)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid var(--glass-border)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
-              zIndex: 30,
-              maxHeight: '220px',
-              overflowY: 'auto',
-              animation: 'dropdownFadeIn 0.15s ease both'
-            }}
-          >
-            {suggestions.map((item, idx) => {
-              const displayName = formatNominatimName(item);
+          {/* Typeahead Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              className="custom-dropdown-menu"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                right: 0,
+                background: 'rgba(28, 42, 35, 0.98)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+                zIndex: 30,
+                maxHeight: '220px',
+                overflowY: 'auto',
+                animation: 'dropdownFadeIn 0.15s ease both'
+              }}
+            >
+              {suggestions.map((item, idx) => {
+                const displayName = formatNominatimName(item);
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectSuggestion(item)}
+                    className="custom-dropdown-option"
+                    style={{
+                      padding: '0.7rem 1rem',
+                      fontSize: '0.88rem',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                      transition: 'background 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    {displayName}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Row: Available Time, Driving radius, & Target Day */}
+      {showAll ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div className="flex-col">
+            <label className="glass-label">
+              <span>Available Time</span>
+            </label>
+            <CustomDropdown
+              id="duration-dropdown-trigger"
+              value={timeWindow}
+              options={TIME_OPTIONS}
+              onChange={setTimeWindow}
+              icon={Clock}
+            />
+          </div>
+
+          <div className="flex-col">
+            <label className="glass-label">
+              <span>Max Driving Time</span>
+            </label>
+            <CustomDropdown
+              id="drive-dropdown-trigger"
+              value={maxDriveTime}
+              options={DRIVE_OPTIONS}
+              onChange={setMaxDriveTime}
+              icon={Compass}
+            />
+          </div>
+
+          <div className="flex-col">
+            <label className="glass-label">
+              <span>Adventure Date</span>
+            </label>
+            <CustomDropdown
+              id="date-dropdown-trigger"
+              value={targetDay}
+              options={upcomingDays}
+              onChange={handleTargetDayChange}
+              icon={Calendar}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          {visibleField === 'duration' && (
+            <div className="flex-col">
+              <label className="glass-label">
+                <span>Available Time</span>
+              </label>
+              <CustomDropdown
+                id="duration-dropdown-trigger"
+                value={timeWindow}
+                options={TIME_OPTIONS}
+                onChange={setTimeWindow}
+                icon={Clock}
+              />
+            </div>
+          )}
+
+          {visibleField === 'drive' && (
+            <div className="flex-col">
+              <label className="glass-label">
+                <span>Max Driving Time</span>
+              </label>
+              <CustomDropdown
+                id="drive-dropdown-trigger"
+                value={maxDriveTime}
+                options={DRIVE_OPTIONS}
+                onChange={setMaxDriveTime}
+                icon={Compass}
+              />
+            </div>
+          )}
+
+          {visibleField === 'date' && (
+            <div className="flex-col">
+              <label className="glass-label">
+                <span>Adventure Date</span>
+              </label>
+              <CustomDropdown
+                id="date-dropdown-trigger"
+                value={targetDay}
+                options={upcomingDays}
+                onChange={handleTargetDayChange}
+                icon={Calendar}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Activities Dropdown */}
+      {(showAll || visibleField === 'activities') && (
+        <div className="flex-col">
+          <label className="glass-label">
+            <span>Preferred Activities</span>
+          </label>
+          <MultiSelectActivityDropdown
+            selectedActivities={selectedActivities}
+            onToggle={toggleActivity}
+            onAddCustom={addCustomActivity}
+            onRemoveCustom={removeCustomActivity}
+            customActivities={customActivities}
+            activityOptions={ACTIVITY_OPTIONS}
+            targetDay={targetDay}
+            startCoords={startCoords}
+            startLocation={startLocation}
+          />
+
+          {/* Soft warning for shoulder seasons */}
+          {selectedActivities.some(a => getActivitySeasonStatus(a, targetDay, startCoords?.latitude, startLocation) === 'shoulder') && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              background: 'rgba(217, 119, 6, 0.05)',
+              border: '1px solid rgba(217, 119, 6, 0.2)',
+              borderRadius: '8px',
+              padding: '0.75rem 1rem',
+              marginTop: '0.75rem',
+              animation: 'fadeIn 0.2s ease both'
+            }}>
+              <AlertTriangle size={14} style={{ color: '#e0a150', marginTop: '2px', flexShrink: 0 }} />
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                Some of your selected activities are in their <strong>shoulder season</strong>. Access, snow coverage, or local conditions may vary significantly.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Experience Level Segmented Control */}
+      {(showAll || visibleField === 'experience') && (
+        <div className="flex-col">
+          <label className="glass-label">
+            <span>Your Experience Level</span>
+          </label>
+          <div id="experience-container" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '4px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            padding: '4px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '12px'
+          }}>
+            {EXPERIENCE_LEVELS.map(lvl => {
+              const isActive = experienceLevel === lvl;
               return (
-                <div
-                  key={idx}
-                  onClick={() => handleSelectSuggestion(item)}
-                  className="custom-dropdown-option"
+                <button
+                  type="button"
+                  key={lvl}
+                  onClick={() => setExperienceLevel(lvl)}
                   style={{
-                    padding: '0.7rem 1rem',
-                    fontSize: '0.88rem',
-                    color: 'var(--text-primary)',
+                    padding: '0.65rem 0.25rem',
+                    fontSize: '0.82rem',
+                    fontFamily: 'var(--font-sans)',
+                    fontWeight: isActive ? 600 : 500,
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: isActive ? 'var(--accent-moss)' : 'transparent',
+                    color: isActive ? '#ffffff' : 'var(--text-secondary)',
                     cursor: 'pointer',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                    transition: 'background 0.15s ease'
+                    boxShadow: isActive ? '0 2px 6px rgba(0, 0, 0, 0.2)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  {displayName}
-                </div>
+                  {lvl}
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
-
-      {/* Row: Available Time, Driving radius, & Target Day */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-        <div className="flex-col">
-          <label className="glass-label">
-            <span>Available Time</span>
-          </label>
-          <CustomDropdown
-            id="duration-dropdown-trigger"
-            value={timeWindow}
-            options={TIME_OPTIONS}
-            onChange={setTimeWindow}
-            icon={Clock}
-          />
         </div>
-
-        <div className="flex-col">
-          <label className="glass-label">
-            <span>Max Driving Time</span>
-          </label>
-          <CustomDropdown
-            id="drive-dropdown-trigger"
-            value={maxDriveTime}
-            options={DRIVE_OPTIONS}
-            onChange={setMaxDriveTime}
-            icon={Compass}
-          />
-        </div>
-
-        <div className="flex-col">
-          <label className="glass-label">
-            <span>Adventure Date</span>
-          </label>
-          <CustomDropdown
-            id="date-dropdown-trigger"
-            value={targetDay}
-            options={upcomingDays}
-            onChange={handleTargetDayChange}
-            icon={Calendar}
-          />
-        </div>
-      </div>
-
-      {/* Activities Dropdown */}
-      <div className="flex-col">
-        <label className="glass-label">
-          <span>Preferred Activities</span>
-        </label>
-        <MultiSelectActivityDropdown
-          selectedActivities={selectedActivities}
-          onToggle={toggleActivity}
-          onAddCustom={addCustomActivity}
-          onRemoveCustom={removeCustomActivity}
-          customActivities={customActivities}
-          activityOptions={ACTIVITY_OPTIONS}
-          targetDay={targetDay}
-          startCoords={startCoords}
-          startLocation={startLocation}
-        />
-
-        {/* Soft warning for shoulder seasons */}
-        {selectedActivities.some(a => getActivitySeasonStatus(a, targetDay, startCoords?.latitude, startLocation) === 'shoulder') && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px',
-            background: 'rgba(217, 119, 6, 0.05)',
-            border: '1px solid rgba(217, 119, 6, 0.2)',
-            borderRadius: '8px',
-            padding: '0.75rem 1rem',
-            marginTop: '0.75rem',
-            animation: 'fadeIn 0.2s ease both'
-          }}>
-            <AlertTriangle size={14} style={{ color: '#e0a150', marginTop: '2px', flexShrink: 0 }} />
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-              Some of your selected activities are in their <strong>shoulder season</strong>. Access, snow coverage, or local conditions may vary significantly.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Experience Level Segmented Control */}
-      <div className="flex-col">
-        <label className="glass-label">
-          <span>Your Experience Level</span>
-        </label>
-        <div id="experience-container" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '4px',
-          background: 'rgba(255, 255, 255, 0.04)',
-          padding: '4px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '12px'
-        }}>
-          {EXPERIENCE_LEVELS.map(lvl => {
-            const isActive = experienceLevel === lvl;
-            return (
-              <button
-                type="button"
-                key={lvl}
-                onClick={() => setExperienceLevel(lvl)}
-                style={{
-                  padding: '0.65rem 0.25rem',
-                  fontSize: '0.82rem',
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: isActive ? 600 : 500,
-                  border: 'none',
-                  borderRadius: '8px',
-                  background: isActive ? 'var(--accent-moss)' : 'transparent',
-                  color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  boxShadow: isActive ? '0 2px 6px rgba(0, 0, 0, 0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {lvl}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {/* Notes Field */}
-      <div className="flex-col">
-        <label className="glass-label">
-          <span>Special Requests or Notes</span>
-        </label>
-        <textarea
-          id="notes-input"
-          className="glass-textarea"
-          rows={3}
-          placeholder="e.g. dog friendly, scenic views, shade preferred, avoid highway congestion..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          style={{ resize: 'vertical' }}
-        />
-      </div>
+      {(showAll || visibleField === 'notes') && (
+        <div className="flex-col">
+          <label className="glass-label">
+            <span>Special Requests or Notes</span>
+          </label>
+          <textarea
+            id="notes-input"
+            className="glass-textarea"
+            rows={3}
+            placeholder="e.g. dog friendly, scenic views, shade preferred, avoid highway congestion..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            style={{ resize: 'vertical' }}
+          />
+        </div>
+      )}
 
       {validationError && (
         <div style={{
