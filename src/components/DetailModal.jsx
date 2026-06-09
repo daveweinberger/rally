@@ -289,82 +289,10 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                 <h3 style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>
                   Recent Reports & Tips
                 </h3>
-                <button
-                  onClick={handleFetchLiveTips}
-                  disabled={tipsLoading}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(72, 178, 124, 0.4)',
-                    borderRadius: '16px',
-                    padding: '4px 10px',
-                    fontSize: '0.72rem',
-                    color: 'var(--accent-moss)',
-                    cursor: tipsLoading ? 'default' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s',
-                    opacity: tipsLoading ? 0.6 : 1,
-                    outline: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!tipsLoading) {
-                      e.currentTarget.style.background = 'rgba(72, 178, 124, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.8)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.4)';
-                  }}
-                >
-                  <RefreshCw 
-                    size={10} 
-                    style={{ 
-                      animation: tipsLoading ? 'spin 1s linear infinite' : 'none' 
-                    }} 
-                  />
-                  <span>{tipsLoading ? 'Updating...' : tipsFetched ? 'Update Live' : 'Get Live Reports'}</span>
-                </button>
               </div>
               
-              {tipsLoading ? (
-                <div className="flex-col gap-sm" style={{ gap: '10px' }}>
-                  {[1, 2, 3].map((i) => (
-                    <div 
-                      key={i} 
-                      className="pulse"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        borderRadius: '10px',
-                        padding: '0.85rem 1rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        height: '75px',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '85%' }}></div>
-                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '60%' }}></div>
-                      <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', width: '30%', marginTop: '4px' }}></div>
-                    </div>
-                  ))}
-                </div>
-              ) : tipsError ? (
-                <div style={{ 
-                  fontSize: '0.82rem', 
-                  color: '#f87171', 
-                  background: 'rgba(248, 113, 113, 0.05)', 
-                  border: '1px solid rgba(248, 113, 113, 0.15)', 
-                  borderRadius: '10px', 
-                  padding: '0.85rem 1rem',
-                  textAlign: 'center' 
-                }}>
-                  {tipsError}
-                </div>
-              ) : (
+              {/* Existing Tips list */}
+              {localTips && localTips.length > 0 && (
                 <div className="flex-col gap-sm" style={{ gap: '10px' }}>
                   {localTips.map((tip, idx) => {
                     const tipText = typeof tip === 'object' ? tip.text : tip;
@@ -376,8 +304,8 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                       if (!tipSource) return false;
                       const src = tipSource.toLowerCase();
                       const dt = (tipDate || '').toLowerCase();
-                      if (src.includes('general guidance') || src.includes('seasonal patterns') || src.includes('seasonal average')) return false;
-                      if (dt.includes('general guidance') || dt.includes('seasonal patterns') || dt.includes('seasonal average')) return false;
+                      const isGeneral = src.includes('general') || src.includes('season') || src.includes('knowledge') || src.includes('gemini') || dt.includes('general') || dt.includes('season');
+                      if (isGeneral) return false;
                       return true;
                     })();
 
@@ -395,7 +323,8 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                           flexDirection: 'column',
                           gap: '6px',
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                          transition: 'border-color 0.2s',
+                          transition: 'border-color 0.2s, opacity 0.3s',
+                          opacity: tipsLoading ? 0.65 : 1,
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(72, 178, 124, 0.2)'}
                         onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
@@ -446,6 +375,103 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                   })}
                 </div>
               )}
+
+              {/* Skeleton loaders showing below the existing list while loading */}
+              {tipsLoading && (
+                <div className="flex-col gap-sm" style={{ gap: '10px', marginTop: localTips.length > 0 ? '12px' : '0' }}>
+                  {/* Subtle live fetching banner */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.75rem',
+                    color: 'var(--accent-moss)',
+                    background: 'rgba(72, 178, 124, 0.05)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px dashed rgba(72, 178, 124, 0.25)',
+                    marginBottom: '4px'
+                  }}>
+                    <RefreshCw size={12} style={{ animation: 'spin 1.2s linear infinite' }} />
+                    <span style={{ fontWeight: 600 }}>Searching live sources (AllTrails, WTA, NPS) for current conditions...</span>
+                  </div>
+                  
+                  {[1, 2].map((i) => (
+                    <div 
+                      key={i} 
+                      className="pulse"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '10px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        height: '75px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '85%' }}></div>
+                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '60%' }}></div>
+                      <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', width: '30%', marginTop: '4px' }}></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Error display */}
+              {tipsError && !tipsLoading && (
+                <div style={{ 
+                  fontSize: '0.82rem', 
+                  color: '#f87171', 
+                  background: 'rgba(248, 113, 113, 0.05)', 
+                  border: '1px solid rgba(248, 113, 113, 0.15)', 
+                  borderRadius: '10px', 
+                  padding: '0.85rem 1rem',
+                  textAlign: 'center',
+                  marginTop: '10px'
+                }}>
+                  {tipsError}
+                </div>
+              )}
+
+              <button
+                onClick={handleFetchLiveTips}
+                disabled={tipsLoading}
+                style={{
+                  background: 'rgba(72, 178, 124, 0.1)',
+                  border: '1px solid rgba(72, 178, 124, 0.5)',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  fontSize: '0.85rem',
+                  color: 'var(--accent-moss)',
+                  fontWeight: 600,
+                  cursor: tipsLoading ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  width: '100%',
+                  transition: 'all 0.2s',
+                  opacity: tipsLoading ? 0.6 : 1,
+                  marginTop: '4px',
+                  outline: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!tipsLoading) {
+                    e.currentTarget.style.background = 'rgba(72, 178, 124, 0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!tipsLoading) {
+                    e.currentTarget.style.background = 'rgba(72, 178, 124, 0.1)';
+                  }
+                }}
+              >
+                <RefreshCw size={14} style={{ animation: tipsLoading ? 'spin 1s linear infinite' : 'none' }} />
+                <span>{tipsLoading ? 'Searching for live community reports...' : tipsFetched ? 'Check for newer live reports' : 'Fetch Live Community Reports'}</span>
+              </button>
             </div>
           )}
 
@@ -467,7 +493,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
 
         {/* Directions CTA Button */}
         <a 
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.name ? `${activity.name}, ${activity.location}` : `${activity.latitude},${activity.longitude}`)}${activity.placeId && !cleanPlaceId(activity.placeId).startsWith('mock') ? `&query_place_id=${cleanPlaceId(activity.placeId)}` : ''}`}
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.name ? `${activity.name}, ${activity.location}` : `${activity.latitude},${activity.longitude}`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="glass-btn glass-btn-primary"

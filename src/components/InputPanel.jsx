@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Navigation, Clock, Compass, Locate, Calendar, ChevronDown, AlertTriangle, Check, X, Plus } from 'lucide-react';
 import { getActivitySeasonStatus } from '../utils/seasonalUtils.js';
 
-const TIME_OPTIONS = [
+export const TIME_OPTIONS = [
   { value: 'Half day (4h)', label: 'Half Day (~4h)' },
   { value: 'Full day (8h)', label: 'Full Day (~8h)' },
   { value: 'Weekend', label: 'Multi-Day (Weekend)' }
 ];
 
-const DRIVE_OPTIONS = [
+export const DRIVE_OPTIONS = [
   { value: '30 minutes', label: '< 30 Minutes' },
   { value: '1 hour', label: '< 1 Hour' },
   { value: '1.5 hours', label: '< 1.5 Hours' },
@@ -16,9 +16,9 @@ const DRIVE_OPTIONS = [
   { value: '3+ hours', label: '3+ Hours' }
 ];
 
-const EXPERIENCE_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+export const EXPERIENCE_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
-const ACTIVITY_OPTIONS = [
+export const ACTIVITY_OPTIONS = [
   { id: 'Hiking', label: 'Hiking' },
   { id: 'Climbing', label: 'Climbing' },
   { id: 'Mountain Biking', label: 'MTB' },
@@ -27,7 +27,7 @@ const ACTIVITY_OPTIONS = [
   { id: 'Kayaking', label: 'Paddle/Kayak' }
 ];
 
-const getUpcomingDays = () => {
+export const getUpcomingDays = () => {
   const days = [];
   const today = new Date();
   for (let i = 0; i < 6; i++) {
@@ -45,7 +45,7 @@ const getUpcomingDays = () => {
   return days;
 };
 
-function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
+export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -144,7 +144,7 @@ function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
   );
 }
 
-function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAddCustom, onRemoveCustom, customActivities, activityOptions, targetDay, startCoords, startLocation }) {
+export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAddCustom, onRemoveCustom, customActivities, activityOptions, targetDay, startCoords, startLocation }) {
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -479,7 +479,7 @@ function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAddCustom
   );
 }
 
-const formatNominatimName = (item) => {
+export const formatNominatimName = (item) => {
   const address = item.address || {};
   const city = address.city || address.town || address.village || address.hamlet || address.suburb;
   const state = address.state;
@@ -494,7 +494,7 @@ const formatNominatimName = (item) => {
   return item.display_name.split(',').slice(0, 3).join(',').trim();
 };
 
-export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus }) {
+export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus, submitLabel, onCancel }) {
   const upcomingDays = getUpcomingDays();
   
   const [startLocation, setStartLocation] = useState(initialConstraints?.startLocation || 'Seattle, WA');
@@ -569,11 +569,20 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
           el = document.getElementById('activities-dropdown-trigger');
         } else if (autoFocusField === 'drive') {
           el = document.getElementById('drive-dropdown-trigger');
+        } else if (autoFocusField === 'duration') {
+          el = document.getElementById('duration-dropdown-trigger');
+        } else if (autoFocusField === 'experience') {
+          const container = document.getElementById('experience-container');
+          if (container) {
+            el = container.querySelector('button');
+          }
+        } else if (autoFocusField === 'notes') {
+          el = document.getElementById('notes-input');
         }
         
         if (el) {
           el.focus();
-          if (autoFocusField !== 'location') {
+          if (autoFocusField !== 'location' && autoFocusField !== 'notes' && autoFocusField !== 'experience') {
             el.click();
           }
         }
@@ -865,6 +874,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
             <span>Available Time</span>
           </label>
           <CustomDropdown
+            id="duration-dropdown-trigger"
             value={timeWindow}
             options={TIME_OPTIONS}
             onChange={setTimeWindow}
@@ -942,7 +952,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
         <label className="glass-label">
           <span>Your Experience Level</span>
         </label>
-        <div style={{
+        <div id="experience-container" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '4px',
@@ -985,6 +995,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
           <span>Special Requests or Notes</span>
         </label>
         <textarea
+          id="notes-input"
           className="glass-textarea"
           rows={3}
           placeholder="e.g. dog friendly, scenic views, shade preferred, avoid highway congestion..."
@@ -1012,26 +1023,53 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
         </div>
       )}
 
-      {/* Submit Button */}
-      <button
-        type="submit"
-        className={`glass-btn ${isFormComplete ? 'glass-btn-primary' : ''}`}
-        style={{
-          width: '100%',
-          padding: '0.9rem',
-          fontSize: '0.95rem',
-          background: isFormComplete ? 'var(--accent-moss)' : 'rgba(255, 255, 255, 0.05)',
-          color: isFormComplete ? '#ffffff' : 'var(--text-secondary)',
-          border: isFormComplete ? '1px solid rgba(72, 178, 124, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: isFormComplete ? '0 4px 14px rgba(72, 178, 124, 0.25)' : 'none',
-          cursor: 'pointer',
-          opacity: isFormComplete ? 1 : 0.7,
-          transition: 'all 0.2s ease'
-        }}
-      >
-        <Compass size={16} />
-        Plan My Rally
-      </button>
+      {/* Submit / Action Buttons */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        width: '100%',
+        marginTop: '0.5rem'
+      }}>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="glass-btn glass-btn-outline"
+            style={{
+              flex: 1,
+              padding: '0.9rem',
+              fontSize: '0.95rem',
+              justifyContent: 'center'
+            }}
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
+          className={`glass-btn ${isFormComplete ? 'glass-btn-primary' : ''}`}
+          style={{
+            flex: onCancel ? 2 : 1,
+            width: onCancel ? 'auto' : '100%',
+            padding: '0.9rem',
+            fontSize: '0.95rem',
+            background: isFormComplete ? 'var(--accent-moss)' : 'rgba(255, 255, 255, 0.05)',
+            color: isFormComplete ? '#ffffff' : 'var(--text-secondary)',
+            border: isFormComplete ? '1px solid rgba(72, 178, 124, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: isFormComplete ? '0 4px 14px rgba(72, 178, 124, 0.25)' : 'none',
+            cursor: 'pointer',
+            opacity: isFormComplete ? 1 : 0.7,
+            transition: 'all 0.2s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          <Compass size={16} />
+          {submitLabel || 'Plan My Rally'}
+        </button>
+      </div>
     </form>
   );
 }

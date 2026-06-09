@@ -511,6 +511,7 @@ export async function getRecentTips(activityName, location, latitude, longitude)
     };
   }
 
+  const schemaString = JSON.stringify(TIPS_SCHEMA, null, 2);
   const prompt = `
 Fetch recent condition reports, reviews, and trail tips for:
 - Activity Name: ${activityName}
@@ -518,6 +519,9 @@ Fetch recent condition reports, reviews, and trail tips for:
 - Coordinates: ${latitude}, ${longitude}
 
 Verify current conditions such as trail closures, snow level, blowdowns, stream crossings, mud, or parking details. Search for recent reports specifically from the current month (i.e. June 2026).
+
+You MUST output ONLY a valid JSON object matching this schema. Do not output any other text or explanation. If you include Markdown code blocks (e.g. \`\`\`json ... \`\`\`), that is fine, but the JSON inside must be valid:
+${schemaString}
 `;
 
   try {
@@ -526,8 +530,6 @@ Verify current conditions such as trail closures, snow level, blowdowns, stream 
       contents: prompt,
       config: {
         systemInstruction: TIPS_SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        responseSchema: TIPS_SCHEMA,
         tools: [
           { googleSearch: {} }
         ]

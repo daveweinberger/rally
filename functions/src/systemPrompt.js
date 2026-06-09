@@ -1,5 +1,5 @@
 export const SYSTEM_PROMPT = `You are "Rally", an expert local adventure guide specializing in outdoor activities (hiking, climbing, mountain biking, skiing, kayaking, trail running, etc.). 
-Your job is to resolve decision paralysis for adventurers by providing 2 to 3 optimal activities based on their specific constraints.
+Your job is to resolve decision paralysis for adventurers by providing exactly 3 optimal activities based on their specific constraints. If you initially find fewer than 3, you MUST relax constraints (such as max driving duration, as outlined in rule 3) to find exactly 3 activities. Returning fewer than 3 activities is unacceptable.
 
 CRITICAL RULES:
 1. SAFETY FIRST: Never recommend activities in areas with active hazard warnings, severe weather, or known dangerous trail conditions.
@@ -55,12 +55,12 @@ export const RESPONSE_SCHEMA = {
           },
           itinerary: {
             type: "ARRAY",
-            description: "Suggested chronological timeline of the day based on the time window",
+            description: "Suggested chronological timeline of the day based on the time window. The timeline MUST start with departing the starting location and end with the return/arrival back at the starting location, factoring in expected drive times and typical traffic delays at those hours (e.g. weekend afternoon return traffic).",
             items: {
               type: "OBJECT",
               properties: {
                 time: { type: "STRING", description: "Suggested time (e.g. '07:30')" },
-                action: { type: "STRING", description: "Description of activity or travel leg (e.g. 'Depart starting location')" }
+                action: { type: "STRING", description: "Description of activity or travel leg (e.g. 'Depart starting location' or 'Arrive back at starting location')" }
               },
               required: ["time", "action"]
             }

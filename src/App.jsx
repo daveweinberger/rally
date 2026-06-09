@@ -5,6 +5,7 @@ import LoadingState from './components/LoadingState.jsx';
 import ResultCard from './components/ResultCard.jsx';
 import DetailModal from './components/DetailModal.jsx';
 import ChatInterface from './components/ChatInterface.jsx';
+import ParameterBar from './components/ParameterBar.jsx';
 import { useAdventureSearch } from './hooks/useAdventureSearch.js';
 import { useRefinement } from './hooks/useRefinement.js';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
@@ -113,6 +114,11 @@ function App() {
         {/* State 4: Results */}
         {status === 'done' && (
           <div className="flex-col gap-lg" style={{ animation: 'fadeIn 0.3s ease both' }}>
+            <ParameterBar 
+              constraints={activeConstraints} 
+              onSubmit={handleSearchSubmit} 
+              isLoading={isLoading} 
+            />
             {results.length === 0 ? (
               <div className="glass-card flex-col align-center gap-md" style={{ padding: '2.5rem 2rem', textAlign: 'center', borderTop: '4px solid #e0a150' }}>
                 <div style={{

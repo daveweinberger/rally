@@ -524,3 +524,97 @@ code, pre, .tech-data {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Search Parameters Bar & Pills */
+.parameter-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0.5rem 0 0.75rem 0;
+  animation: fadeIn 0.3s ease both;
+}
+
+.parameter-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.parameter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.parameter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.parameter-pill.active {
+  background: rgba(72, 178, 124, 0.12);
+  border-color: rgba(72, 178, 124, 0.3);
+  color: var(--accent-moss);
+  font-weight: 600;
+}
+
+.parameter-edit-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(72, 178, 124, 0.08);
+  border: 1px solid rgba(72, 178, 124, 0.2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-moss);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.parameter-edit-all-btn:hover {
+  background: rgba(72, 178, 124, 0.16);
+  border-color: rgba(72, 178, 124, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Collapsible Edit Panel */
+.parameter-edit-panel {
+  background: rgba(24, 38, 30, 0.95) !important;
+  border-left: 4px solid var(--accent-moss) !important;
+  margin-top: 0.5rem;
+  padding: 1.5rem !important;
+  border-radius: var(--radius-lg);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04) !important;
+  animation: slideDownPanel 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideDownPanel {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Highlight style for focused quick-edit field */
+.quick-edit-focused {
+  border-color: var(--accent-moss) !important;
+  box-shadow: 0 0 0 4px rgba(72, 178, 124, 0.18) !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+}
