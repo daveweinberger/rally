@@ -25,13 +25,58 @@ function getWaypoint(waypointInput) {
   return { address: String(waypointInput || '') };
 }
 
+// Calculate haversine distance in meters between two coordinates
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth radius in meters
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) *
+    Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+// Extract coordinates from object
+function extractCoords(input) {
+  if (input && typeof input === 'object') {
+    if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {
+      return { lat: input.latitude, lng: input.longitude };
+    }
+    if (typeof input.lat === 'number' && typeof input.lng === 'number') {
+      return { lat: input.lat, lng: input.lng };
+    }
+  }
+  return null;
+}
+
+// Get coordinates for common cities
+function getCityCoords(name) {
+  const clean = String(name || '').toLowerCase();
+  if (clean.includes('seattle')) return { lat: 47.6062, lng: -122.3321 };
+  if (clean.includes('bellingham')) return { lat: 48.7519, lng: -122.4787 };
+  if (clean.includes('portland')) return { lat: 45.5152, lng: -122.6784 };
+  if (clean.includes('denver')) return { lat: 39.7392, lng: -104.9903 };
+  if (clean.includes('los angeles') || clean.includes('la')) return { lat: 34.0522, lng: -118.2437 };
+  if (clean.includes('san francisco') || clean.includes('sf')) return { lat: 37.7749, lng: -122.4194 };
+  if (clean.includes('san diego')) return { lat: 32.7157, lng: -117.1611 };
+  if (clean.includes('new york') || clean.includes('nyc')) return { lat: 40.7128, lng: -74.0060 };
+  return null;
+}
+
 /**
  * Computes drive route between origin and destination using Google Routes API
  * @param {string|object} originInput 
  * @param {string|object} destinationInput 
+ * @param {object|null} fallbackCoords
  * @returns {Promise<object>}
  */
-export async function computeRoute(originInput, destinationInput) {
+export async function computeRoute(originInput, destinationInput, fallbackCoords = null) {
   const originStr = typeof originInput === 'string' ? originInput : JSON.stringify(originInput);
   const destinationStr = typeof destinationInput === 'string' ? destinationInput : JSON.stringify(destinationInput);
   
@@ -112,7 +157,48 @@ export async function computeRoute(originInput, destinationInput) {
 
   } catch (error) {
     console.error(`Error calculating route ${originStr} -> ${destinationStr}:`, error);
-    // Fallback stub in case API fails
+    
+    // Dynamic haversine estimation fallback
+    const originCoords = extractCoords(originInput) || getCityCoords(originInput);
+    const destCoords = extractCoords(destinationInput) || fallbackCoords;
+    
+    if (originCoords && destCoords) {
+      try {
+        const oLat = originCoords.latitude || originCoords.lat;
+        const oLng = originCoords.longitude || originCoords.lng;
+        const dLat = destCoords.latitude || destCoords.lat;
+        const dLng = destCoords.longitude || destCoords.lng;
+        
+        const straightLineMeters = haversineDistance(oLat, oLng, dLat, dLng);
+        
+        // Multiplier for winding mountain roads/detours (average 35%)
+        const estDistanceMeters = straightLineMeters * 1.35;
+        
+        // Average speed: 45 mph (approx 20.1 meters per second)
+        const estDurationSeconds = Math.max(300, Math.round(estDistanceMeters / 20.1));
+        
+        const miles = estDistanceMeters / 1609.34;
+        const hours = Math.floor(estDurationSeconds / 3600);
+        const mins = Math.round((estDurationSeconds % 3600) / 60);
+        
+        let durationText = "";
+        if (hours > 0) {
+          durationText += `${hours} hr${hours > 1 ? 's' : ''} `;
+        }
+        durationText += `${mins} min${mins > 1 ? 's' : ''} (fallback)`;
+
+        return {
+          durationSeconds: estDurationSeconds,
+          durationText,
+          distanceMeters: Math.round(estDistanceMeters),
+          distanceText: `${miles.toFixed(1)} mi`
+        };
+      } catch (calcErr) {
+        console.error("Failed to compute haversine fallback route:", calcErr);
+      }
+    }
+
+    // Default hardcoded fallback stub if coordinates are completely missing
     return {
       durationSeconds: 1800,
       durationText: "30 mins (fallback)",

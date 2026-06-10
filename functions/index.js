@@ -25,7 +25,8 @@ async function resolveRouteData(origin, activity) {
     destination = `${activity.name}, ${activity.location}`;
   }
 
-  const firstAttempt = await computeRoute(origin, destination);
+  const fallbackCoords = { latitude: activity.latitude, longitude: activity.longitude };
+  const firstAttempt = await computeRoute(origin, destination, fallbackCoords);
   
   if (
     firstAttempt.durationText && 
@@ -33,7 +34,7 @@ async function resolveRouteData(origin, activity) {
     (activity.placeId || (activity.latitude && activity.longitude))
   ) {
     console.log(`Routes API: Primary routing failed for ${activity.name}. Retrying with: "${activity.name}, ${activity.location}"`);
-    return await computeRoute(origin, `${activity.name}, ${activity.location}`);
+    return await computeRoute(origin, `${activity.name}, ${activity.location}`, fallbackCoords);
   }
   
   return firstAttempt;
