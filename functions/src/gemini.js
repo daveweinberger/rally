@@ -481,6 +481,59 @@ export function cleanJsonString(jsonStr) {
 }
 
 /**
+ * Resolves a redirecting URL to its final destination.
+ * Specifically targets Google Search Grounding transient redirect URLs.
+ */
+async function resolveUrl(url) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+    return url;
+  }
+  
+  if (!url.includes('vertexaisearch.cloud.google.com/grounding-api-redirect')) {
+    return url;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (res.url && res.url !== url) {
+      return res.url;
+    }
+  } catch (e) {
+    console.error(`Error resolving redirect for URL: ${url}`, e);
+    // Fallback to GET if HEAD failed (some servers might block HEAD)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.url) return res.url;
+    } catch (e2) {
+      console.error(`Error resolving redirect via GET for URL: ${url}`, e2);
+    }
+  }
+  
+  return url;
+}
+
+/**
  * Fetches recent live tips for a single activity using Google Search Grounding.
  * @param {string} activityName 
  * @param {string} location 
@@ -557,6 +610,20 @@ ${schemaString}
     } catch (parseErr) {
       console.error("Failed to parse Gemini JSON tips output. Raw output:", text);
       throw new Error("Tips output was not in the expected JSON format.", { cause: parseErr });
+    }
+
+    // Resolve any transient search grounding redirect URLs to their final destination
+    if (parsedData && parsedData.recentTips && Array.isArray(parsedData.recentTips)) {
+      const resolvedTips = await Promise.all(
+        parsedData.recentTips.map(async (tip) => {
+          if (tip.link) {
+            const resolvedLink = await resolveUrl(tip.link);
+            return { ...tip, link: resolvedLink };
+          }
+          return tip;
+        })
+      );
+      parsedData.recentTips = resolvedTips;
     }
 
     return parsedData;
