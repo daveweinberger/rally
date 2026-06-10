@@ -164,39 +164,13 @@ export default function ParameterBar({ constraints, onSubmit, isLoading }) {
       {/* Collapsible Quick Edit Panel */}
       {isExpanded && (
         <div className="glass-card parameter-edit-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '1.25rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
               {getPanelTitle()}
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {activeField && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveField(null);
-                    setAutoFocusField(null);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(72, 178, 124, 0.3)',
-                    color: 'var(--accent-moss)',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(72, 178, 124, 0.08)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  Show All Options
-                </button>
-              )}
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Changes will recalculate matching adventures
-              </span>
-            </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Changes will recalculate matching adventures
+            </span>
           </div>
 
           <InputPanel

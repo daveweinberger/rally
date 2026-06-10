@@ -106,7 +106,10 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
       // Add a weather warning if there is a substantial chance of rain
       if (weatherData && weatherData.rainProbability > 30) {
         if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
-        const weatherWarn = `Weather forecast predicts a ${weatherData.rainProbability}% chance of rain (${weatherData.condition}) with temperature highs near ${Math.round(weatherData.maxTemp)}°F.`;
+        const cond = (weatherData.condition || '').toLowerCase();
+        const isRainRelated = cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle') || cond.includes('snow') || cond.includes('storm') || cond.includes('sleet');
+        const condPhrase = isRainRelated ? cond : `rain (${weatherData.condition})`;
+        const weatherWarn = `Weather forecast predicts a ${weatherData.rainProbability}% chance of ${condPhrase} with temperature highs near ${Math.round(weatherData.maxTemp)}°F.`;
         if (!enrichedActivity.warnings.includes(weatherWarn)) {
           enrichedActivity.warnings.unshift(weatherWarn);
         }
@@ -191,7 +194,10 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
 
         if (weatherData && weatherData.rainProbability > 30) {
           if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
-          const weatherWarn = `Weather forecast predicts a ${weatherData.rainProbability}% chance of rain (${weatherData.condition}) with temperature highs near ${Math.round(weatherData.maxTemp)}°F.`;
+          const cond = (weatherData.condition || '').toLowerCase();
+          const isRainRelated = cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle') || cond.includes('snow') || cond.includes('storm') || cond.includes('sleet');
+          const condPhrase = isRainRelated ? cond : `rain (${weatherData.condition})`;
+          const weatherWarn = `Weather forecast predicts a ${weatherData.rainProbability}% chance of ${condPhrase} with temperature highs near ${Math.round(weatherData.maxTemp)}°F.`;
           if (!enrichedActivity.warnings.includes(weatherWarn)) {
             enrichedActivity.warnings.unshift(weatherWarn);
           }

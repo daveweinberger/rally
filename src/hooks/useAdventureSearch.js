@@ -23,13 +23,17 @@ export function useAdventureSearch() {
 
     try {
       const searchFn = httpsCallable(functions, 'searchAdventures');
-      const response = searchFn(constraints);
-      const stream = response.stream;
+      
+      let stream;
+      if (typeof searchFn.stream === 'function') {
+        const response = await searchFn.stream(constraints);
+        stream = response.stream;
+      }
 
       if (!stream) {
         // Fallback for environments where stream is undefined
         console.warn("Callable streaming not supported. Waiting for complete response.");
-        const result = await response;
+        const result = await searchFn(constraints);
         const data = result.data;
         
         if (data.status === 'done') {
@@ -55,7 +59,7 @@ export function useAdventureSearch() {
 
       // Read chunks from the stream
       for await (const chunk of stream) {
-        const data = chunk.data;
+        const data = chunk;
         console.log("Frontend received stream chunk:", data);
         
         if (data.status === 'analyzing' || data.status === 'querying' || data.status === 'routing') {

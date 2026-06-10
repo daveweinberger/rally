@@ -55,68 +55,26 @@ ${generalExplanation}`;
     try {
       const refineFn = httpsCallable(functions, 'refineAdventure');
       // Use client history context (excludes the placeholder)
-      const response = refineFn({
+      const result = await refineFn({
         history: updatedMessages,
         message: text,
         constraints: initialConstraints
       });
-
-      const stream = response.stream;
-
-      if (!stream) {
-        console.warn("Streaming refinement is not supported by Firebase client SDK. Falling back.");
-        const result = await response;
-        const data = result.data;
-        
-        if (data.results && data.results.length > 0 && onUpdateResults) {
-          onUpdateResults(data.results, data.generalExplanation, data.groundingMetadata);
-        }
-        
-        setMessages(prev => {
-          const list = [...prev];
-          list[list.length - 1] = {
-            role: 'model',
-            content: data.text,
-            groundingMetadata: data.groundingMetadata || null
-          };
-          return list;
-        });
-        setIsStreaming(false);
-        return;
+      const data = result.data;
+      
+      if (data.results && data.results.length > 0 && onUpdateResults) {
+        onUpdateResults(data.results, data.generalExplanation, data.groundingMetadata);
       }
-
-      let accumulatedText = "";
-      for await (const chunk of stream) {
-        const data = chunk.data;
-        
-        if (data.chunk) {
-          accumulatedText += data.chunk;
-          setMessages(prev => {
-            const list = [...prev];
-            // update placeholder content
-            list[list.length - 1] = {
-              ...list[list.length - 1],
-              content: accumulatedText
-            };
-            return list;
-          });
-        }
-        
-        if (data.done) {
-          if (data.results && data.results.length > 0 && onUpdateResults) {
-            onUpdateResults(data.results, data.generalExplanation, data.groundingMetadata);
-          }
-          setMessages(prev => {
-            const list = [...prev];
-            list[list.length - 1] = {
-              role: 'model',
-              content: data.text,
-              groundingMetadata: data.groundingMetadata || null
-            };
-            return list;
-          });
-        }
-      }
+      
+      setMessages(prev => {
+        const list = [...prev];
+        list[list.length - 1] = {
+          role: 'model',
+          content: data.text,
+          groundingMetadata: data.groundingMetadata || null
+        };
+        return list;
+      });
     } catch (err) {
       console.error("Adventure chat refinement failed:", err);
       

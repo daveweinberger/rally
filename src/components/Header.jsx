@@ -1,5 +1,6 @@
 import React from 'react';
 import { Compass } from 'lucide-react';
+import versionInfo from '../version.json';
 
 export default function Header() {
   return (
@@ -27,7 +28,7 @@ export default function Header() {
         color: 'var(--text-secondary)',
         fontWeight: 500
       }}>
-        Adventure Planner
+        Adventure Planner <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '4px' }}>v{versionInfo.version}</span>
       </div>
     </header>
   );
