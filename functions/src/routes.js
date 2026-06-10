@@ -191,7 +191,8 @@ export async function computeRoute(originInput, destinationInput, fallbackCoords
           durationSeconds: estDurationSeconds,
           durationText,
           distanceMeters: Math.round(estDistanceMeters),
-          distanceText: `${miles.toFixed(1)} mi`
+          distanceText: `${miles.toFixed(1)} mi`,
+          isFallback: true
         };
       } catch (calcErr) {
         console.error("Failed to compute haversine fallback route:", calcErr);
@@ -203,7 +204,8 @@ export async function computeRoute(originInput, destinationInput, fallbackCoords
       durationSeconds: 1800,
       durationText: "30 mins (fallback)",
       distanceMeters: 25000,
-      distanceText: "15.5 mi"
+      distanceText: "15.5 mi",
+      isFallback: true
     };
   }
 }

@@ -104,6 +104,15 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
         weather: weatherData
       };
 
+      // Add route warning if it's a fallback route (e.g. closed road or remote area)
+      if (routeData.isFallback) {
+        if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
+        const routeWarn = `Standard driving route could not be calculated (often due to active road closures, seasonal road conditions, or unpaved forest roads). Showing estimated fallback times.`;
+        if (!enrichedActivity.warnings.includes(routeWarn)) {
+          enrichedActivity.warnings.push(routeWarn);
+        }
+      }
+
       // Add a weather warning if there is a substantial chance of rain
       if (weatherData && weatherData.rainProbability > 30) {
         if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
@@ -192,6 +201,15 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
           distanceMeters: routeData.distanceMeters,
           weather: weatherData
         };
+
+        // Add route warning if it's a fallback route
+        if (routeData.isFallback) {
+          if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
+          const routeWarn = `Standard driving route could not be calculated (often due to active road closures, seasonal road conditions, or unpaved forest roads). Showing estimated fallback times.`;
+          if (!enrichedActivity.warnings.includes(routeWarn)) {
+            enrichedActivity.warnings.push(routeWarn);
+          }
+        }
 
         if (weatherData && weatherData.rainProbability > 30) {
           if (!enrichedActivity.warnings) enrichedActivity.warnings = [];
