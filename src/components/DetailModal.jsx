@@ -221,17 +221,35 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
             </div>
           )}
 
-          {/* Relaxed constraints badge */}
+          {/* Relaxed constraints alert */}
           {activity.relaxedConstraints && activity.relaxedConstraints.length > 0 && (
             <div style={{
-              fontSize: '0.75rem',
+              fontSize: '0.78rem',
               color: 'var(--accent-moss)',
-              background: 'rgba(72, 178, 124, 0.05)',
-              padding: '6px 12px',
+              background: 'rgba(72, 178, 124, 0.04)',
+              padding: '0.85rem 1rem',
               border: '1px dashed rgba(72, 178, 124, 0.25)',
-              borderRadius: '8px'
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
             }}>
-              Note: Adjusted parameters ({activity.relaxedConstraints.join(', ')}) to find matching activities.
+              <div style={{ fontWeight: 700, fontSize: '0.82rem' }}>Adjusted Constraints</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: 1.45, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {activity.relaxedConstraints.map((constraint, idx) => {
+                  const colonIndex = constraint.indexOf(':');
+                  if (colonIndex !== -1) {
+                    const name = constraint.substring(0, colonIndex).trim();
+                    const desc = constraint.substring(colonIndex + 1).trim();
+                    return (
+                      <li key={idx} style={{ color: 'var(--text-secondary)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{name}</span>: {desc}
+                      </li>
+                    );
+                  }
+                  return <li key={idx} style={{ color: 'var(--text-secondary)' }}>{constraint}</li>;
+                })}
+              </ul>
             </div>
           )}
 
