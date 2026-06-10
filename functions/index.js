@@ -3,6 +3,7 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getRecommendations, getRefinementStream, getRecentTips } from './src/gemini.js';
 import { computeRoute } from './src/routes.js';
 import { fetchWeather } from './src/weather.js';
+import { adjustItinerary } from './src/itinerary.js';
 
 // Initialize firebase admin if not done already
 if (getApps().length === 0) {
@@ -101,7 +102,8 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
         driveTimeSeconds: routeData.durationSeconds,
         distance: routeData.distanceText,
         distanceMeters: routeData.distanceMeters,
-        weather: weatherData
+        weather: weatherData,
+        itinerary: adjustItinerary(activity.itinerary, routeData.durationSeconds)
       };
 
       // Add route warning if it's a fallback route (e.g. closed road or remote area)
@@ -199,7 +201,8 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
           driveTimeSeconds: routeData.durationSeconds,
           distance: routeData.distanceText,
           distanceMeters: routeData.distanceMeters,
-          weather: weatherData
+          weather: weatherData,
+          itinerary: adjustItinerary(activity.itinerary, routeData.durationSeconds)
         };
 
         // Add route warning if it's a fallback route

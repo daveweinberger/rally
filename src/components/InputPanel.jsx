@@ -176,14 +176,6 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
   });
 
   const allSelected = [...selectedActivities];
-  const displayLabel = allSelected.length === 0
-    ? 'Select activities...'
-    : allSelected.length <= 2
-      ? allSelected.map(a => {
-          const opt = activityOptions.find(o => o.id === a);
-          return opt ? opt.label : a;
-        }).join(', ')
-      : `${allSelected.length} activities selected`;
 
   const handleAddCustom = () => {
     const trimmed = customInput.trim();
@@ -196,88 +188,121 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
 
   return (
     <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
-      {/* Trigger button */}
-      <button
+      {/* Trigger container */}
+      <div
         id="activities-dropdown-trigger"
-        type="button"
+        role="button"
+        tabIndex={0}
         className="glass-input custom-dropdown-trigger"
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingLeft: '1rem',
-          paddingRight: '1rem',
+          padding: '6px 36px 6px 12px',
           cursor: 'pointer',
           textAlign: 'left',
           width: '100%',
           position: 'relative',
-          minHeight: '46px'
+          minHeight: '46px',
+          height: 'auto',
+          userSelect: 'none'
         }}
       >
-        <span style={{ color: allSelected.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.95rem' }}>
-          {displayLabel}
-        </span>
-        <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }} />
-      </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', flex: 1 }}>
+          {allSelected.length === 0 ? (
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+              Select activities...
+            </span>
+          ) : (
+            allSelected.map(activity => {
+              const opt = activityOptions.find(o => o.id === activity);
+              const label = opt ? opt.label : activity;
+              const isCustom = customActivities.includes(activity);
+              const seasonStatus = !isCustom ? getActivitySeasonStatus(activity, targetDay, startCoords?.latitude, startLocation) : 'in-season';
+              const isShoulder = seasonStatus === 'shoulder';
 
-      {/* Selected chips below trigger */}
-      {allSelected.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-          {allSelected.map(activity => {
-            const opt = activityOptions.find(o => o.id === activity);
-            const label = opt ? opt.label : activity;
-            const isCustom = customActivities.includes(activity);
-            const seasonStatus = !isCustom ? getActivitySeasonStatus(activity, targetDay, startCoords?.latitude, startLocation) : 'in-season';
-            const isShoulder = seasonStatus === 'shoulder';
-
-            return (
-              <span
-                key={activity}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 10px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  borderRadius: '20px',
-                  background: isShoulder ? 'rgba(217, 119, 6, 0.15)' : 'rgba(72, 178, 124, 0.15)',
-                  color: isShoulder ? '#e0a150' : 'var(--accent-moss)',
-                  border: `1px solid ${isShoulder ? 'rgba(217, 119, 6, 0.3)' : 'rgba(72, 178, 124, 0.3)'}`,
-                  animation: 'fadeIn 0.15s ease both'
-                }}
-              >
-                {label}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isCustom) {
-                      onRemoveCustom(activity);
-                    } else {
-                      onToggle(activity);
-                    }
-                  }}
+              return (
+                <span
+                  key={activity}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '0',
-                    marginLeft: '2px'
+                    gap: '4px',
+                    padding: '3px 8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    borderRadius: '20px',
+                    background: isShoulder ? 'rgba(217, 119, 6, 0.15)' : 'rgba(72, 178, 124, 0.15)',
+                    color: isShoulder ? '#e0a150' : 'var(--accent-moss)',
+                    border: `1px solid ${isShoulder ? 'rgba(217, 119, 6, 0.3)' : 'rgba(72, 178, 124, 0.3)'}`,
+                    animation: 'fadeIn 0.15s ease both'
                   }}
-                  title="Remove"
                 >
-                  <X size={12} />
-                </button>
-              </span>
-            );
-          })}
+                  {label}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isCustom) {
+                        onRemoveCustom(activity);
+                      } else {
+                        onToggle(activity);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (isCustom) {
+                          onRemoveCustom(activity);
+                        } else {
+                          onToggle(activity);
+                        }
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      marginLeft: '4px',
+                      padding: '2px',
+                      borderRadius: '50%',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    title="Remove"
+                  >
+                    <X size={12} />
+                  </span>
+                </span>
+              );
+            })
+          )}
         </div>
-      )}
+        <ChevronDown
+          size={16}
+          style={{
+            color: 'var(--text-secondary)',
+            transition: 'transform 0.2s',
+            transform: isOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%) rotate(0)',
+            flexShrink: 0,
+            position: 'absolute',
+            right: '12px',
+            top: '50%',
+            transformOrigin: 'center'
+          }}
+        />
+      </div>
 
       {/* Dropdown menu */}
       {isOpen && (
@@ -508,7 +533,11 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
   const [experienceLevel, setExperienceLevel] = useState(initialConstraints?.experienceLevel || 'Intermediate');
   const [notes, setNotes] = useState(initialConstraints?.notes || '');
   const [validationError, setValidationError] = useState('');
-  const [customActivities, setCustomActivities] = useState([]);
+  const [customActivities, setCustomActivities] = useState(() => {
+    if (!initialConstraints?.activities) return [];
+    const standardIds = ACTIVITY_OPTIONS.map(opt => opt.id);
+    return initialConstraints.activities.filter(act => !standardIds.includes(act));
+  });
   
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);

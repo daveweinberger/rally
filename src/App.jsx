@@ -12,7 +12,15 @@ import { RotateCcw, AlertTriangle } from 'lucide-react';
 
 function App() {
   const { search, reset, results, setResults, setGeneralExplanation, setGroundingMetadata, generalExplanation, noResultsExplanation, groundingMetadata, status, statusMessage, error, isLoading } = useAdventureSearch();
-  const [activeConstraints, setActiveConstraints] = useState(null);
+  const [activeConstraints, setActiveConstraints] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('rally_constraints');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error('Failed to parse saved constraints:', e);
+      return null;
+    }
+  });
   const [selectedActivity, setSelectedActivity] = useState(null);
 
   // Scroll to top of the page when search completes
@@ -26,11 +34,11 @@ function App() {
 
   const handleSearchSubmit = (constraints) => {
     setActiveConstraints(constraints);
+    sessionStorage.setItem('rally_constraints', JSON.stringify(constraints));
     search(constraints);
   };
 
   const handleReset = () => {
-    setActiveConstraints(null);
     setSelectedActivity(null);
     setFocusField(null);
     reset();
@@ -42,6 +50,7 @@ function App() {
       allowInclementWeather: true
     };
     setActiveConstraints(updatedConstraints);
+    sessionStorage.setItem('rally_constraints', JSON.stringify(updatedConstraints));
     search(updatedConstraints);
   };
 
