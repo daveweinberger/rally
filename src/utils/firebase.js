@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Load values from Vite env vars, fallback to placeholders for local dev
 const firebaseConfig = {
@@ -15,10 +16,22 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app, 'us-central1');
 
+let analytics = null;
+isSupported().then((supported) => {
+  if (supported) {
+    analytics = getAnalytics(app);
+    console.log("Firebase Analytics initialized successfully");
+  } else {
+    console.log("Firebase Analytics is not supported in this environment");
+  }
+}).catch((err) => {
+  console.error("Firebase Analytics failed to initialize:", err);
+});
+
 // Connect to functions emulator if running locally and explicitly requested
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true') {
   console.log("Connecting Firebase Functions client to emulator on localhost:5001");
   connectFunctionsEmulator(functions, 'localhost', 5001);
 }
 
-export { app, functions };
+export { app, functions, analytics };
