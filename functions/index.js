@@ -43,7 +43,7 @@ async function resolveRouteData(origin, activity) {
  * Main adventure search function.
  * Streams status updates and then the final enriched activities.
  */
-export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request) => {
+export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request, response) => {
   const constraints = request.data;
   const acceptsStreaming = request.acceptsStreaming;
 
@@ -51,9 +51,9 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
 
   // Define status sender helper
   const sendStatus = (status, message) => {
-    if (acceptsStreaming && request.response && typeof request.response.sendChunk === 'function') {
+    if (acceptsStreaming && response && typeof response.sendChunk === 'function') {
       try {
-        request.response.sendChunk({ status, message });
+        response.sendChunk({ status, message });
       } catch (err) {
         console.error("Error sending chunk:", err);
       }
@@ -143,8 +143,8 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
       groundingMetadata
     };
 
-    if (acceptsStreaming && request.response && typeof request.response.sendChunk === 'function') {
-      request.response.sendChunk(finalResponse);
+    if (acceptsStreaming && response && typeof response.sendChunk === 'function') {
+      response.sendChunk(finalResponse);
       return null;
     }
 
