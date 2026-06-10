@@ -10,15 +10,19 @@ const versionJsonPath = path.join(__dirname, '../src/version.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const currentVersion = packageJson.version || '0.0.0';
 
-// Split version into major, minor, patch
+// Split version into components
 const parts = currentVersion.split('.').map(Number);
-if (parts.length !== 3 || parts.some(isNaN)) {
+if (parts.length === 3) {
+  parts.push(0);
+}
+
+if (parts.length !== 4 || parts.some(isNaN)) {
   console.error(`Invalid version format in package.json: ${currentVersion}`);
   process.exit(1);
 }
 
-// Increment patch version (the third component)
-parts[2] += 1;
+// Increment the 4th component
+parts[3] += 1;
 const newVersion = parts.join('.');
 
 // Update package.json

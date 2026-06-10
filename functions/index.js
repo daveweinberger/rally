@@ -50,10 +50,10 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
   console.log("Starting searchAdventures with constraints:", constraints);
 
   // Define status sender helper
-  const sendStatus = (status, message) => {
+  const sendStatus = async (status, message) => {
     if (acceptsStreaming && response && typeof response.sendChunk === 'function') {
       try {
-        response.sendChunk({ status, message });
+        await response.sendChunk({ status, message });
       } catch (err) {
         console.error("Error sending chunk:", err);
       }
@@ -62,10 +62,10 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
 
   try {
     // Stage 1: Constraint Analysis
-    sendStatus('analyzing', 'Analyzing your constraints...');
+    await sendStatus('analyzing', 'Analyzing your constraints...');
 
     // Stage 2: Gemini API Call
-    sendStatus('querying', 'Querying Gemini with Google Maps Grounding...');
+    await sendStatus('querying', 'Querying Gemini with Google Maps Grounding...');
     
     // Get weather for the starting coordinates to feed into the prompt
     let startLat = constraints.startCoords?.latitude || 47.6062;
@@ -80,7 +80,7 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
     const groundingMetadata = aiResult.groundingMetadata || {};
 
     // Stage 3: Routing & Weather Calculations
-    sendStatus('routing', 'Calculating optimal driving times, routes, and trailhead weather forecasts...');
+    await sendStatus('routing', 'Calculating optimal driving times, routes, and trailhead weather forecasts...');
     
     const enrichedPromises = activities.map(async (activity) => {
       const origin = constraints.startCoords || constraints.startLocation;
@@ -144,7 +144,7 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
     };
 
     if (acceptsStreaming && response && typeof response.sendChunk === 'function') {
-      response.sendChunk(finalResponse);
+      await response.sendChunk(finalResponse);
       return null;
     }
 
@@ -152,7 +152,7 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
 
   } catch (error) {
     console.error("Error in searchAdventures:", error);
-    sendStatus('error', `Failed to find adventures: ${error.message}`);
+    await sendStatus('error', `Failed to find adventures: ${error.message}`);
     throw error;
   }
 });
