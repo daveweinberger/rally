@@ -73,7 +73,7 @@ export const RESPONSE_SCHEMA = {
           relaxedConstraints: {
             type: "ARRAY",
             items: { type: "STRING" },
-            description: "List of constraints that were loosened to make this recommendation possible"
+            description: "List of constraints that were loosened to make this recommendation possible, explaining exactly what was changed and why (e.g. 'Max driving duration: extended from 1 hour to 2 hours to include Snoqualmie region trails', 'Time window: extended from half-day to full-day to accommodate the 2-hour drive and 5-hour hike')."
           }
         },
         required: ["name", "location", "matchReason", "difficulty", "recentTips", "itinerary", "latitude", "longitude"]
