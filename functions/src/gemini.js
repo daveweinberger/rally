@@ -1,7 +1,8 @@
 /* global process */
 import { GoogleGenAI } from '@google/genai';
+import crypto from 'crypto';
+import { getCache, setCache } from './cache.js';
 import { SYSTEM_PROMPT, RESPONSE_SCHEMA, REFINEMENT_SCHEMA, TIPS_SYSTEM_PROMPT, TIPS_SCHEMA } from './systemPrompt.js';
-
 // Helper to initialize GoogleGenAI client
 function getGenAIClient() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -179,6 +180,25 @@ export async function getRecommendations(constraints, startWeather) {
       };
     }
 
+    const cacheKeyStr = JSON.stringify({
+      loc: constraints.startLocation,
+      coords: constraints.startCoords,
+      date: constraints.targetDay,
+      time: constraints.timeWindow,
+      acts: constraints.activities,
+      drive: constraints.maxDriveTime,
+      exp: constraints.experienceLevel,
+      notes: constraints.notes,
+      weather: startWeather
+    });
+    const cacheKeyHash = crypto.createHash('md5').update(cacheKeyStr).digest('hex');
+    const cacheKey = 'gemini_recs_' + cacheKeyHash;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      console.log(`Gemini Recs Cache Hit`);
+      return cached;
+    }
+
     const ai = getGenAIClient();
   
   // Fallback to mock if API key is not set
@@ -276,10 +296,15 @@ ${schemaString}
       throw new Error("AI output was not in the expected JSON format.", { cause: parseErr });
     }
 
-    return {
+    const resultPayload = {
       data: parsedData,
       groundingMetadata: groundingMetadata
     };
+
+    // Cache for 1 hour (3600 seconds)
+    setCache(cacheKey, resultPayload, 3600);
+
+    return resultPayload;
 
   } catch (error) {
     console.error("Gemini API call failed:", error);
@@ -705,6 +730,16 @@ function correctTipLink(tipLink, tipSource, groundingChunks, activityName) {
  * @returns {Promise<object>}
  */
 export async function getRecentTips(activityName, location, latitude, longitude) {
+  const cacheKeyStr = `${activityName}_${location}_${latitude}_${longitude}`;
+  const cacheKeyHash = crypto.createHash('md5').update(cacheKeyStr).digest('hex');
+  const cacheKey = 'gemini_tips_' + cacheKeyHash;
+
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    console.log(`Gemini Tips Cache Hit for ${activityName}`);
+    return cached;
+  }
+
   const ai = getGenAIClient();
 
   if (!ai) {
@@ -794,6 +829,9 @@ ${schemaString}
       );
       parsedData.recentTips = resolvedTips;
     }
+
+    // Cache tips for 6 hours (21600 seconds)
+    setCache(cacheKey, parsedData, 21600);
 
     return parsedData;
 
