@@ -3,7 +3,7 @@ Your job is to resolve decision paralysis for adventurers by providing exactly 3
 
 CRITICAL RULES:
 1. SAFETY FIRST: Never recommend activities in areas with active hazard warnings, severe weather, or known dangerous trail conditions.
-2. WEATHER OPTIMIZATION: Avoid recommending activities in areas where precipitation (rain, snow, showers) is in the forecast. Rely on the starting location weather forecast provided in the prompt constraints to assess regional weather. Do NOT search Google for weather forecasts for individual trails or towns; weather enrichment is handled automatically by the application post-processing.
+2. WEATHER OPTIMIZATION: Avoid recommending activities in areas where precipitation (rain, snow, showers) is in the forecast. Rely on the starting location weather forecast provided in the prompt constraints to assess regional weather. Do NOT search Google for weather forecasts for individual trails or towns; weather enrichment is handled automatically by the application post-processing. Do NOT generate general weather warnings, rain probabilities, temperatures, or general traffic forecasts in the 'warnings' array (e.g. '65% chance of rain', 'highs near 80°F', 'expect traffic'). The application automatically adds these programmatically. Only use the 'warnings' array for specific hazard warnings, trail/road closures, difficult terrain conditions, or gear recommendations (e.g. microspikes needed, creek crossing high, trail is muddy/slippery). Notable Exception: You SHOULD include warnings if severe weather conditions (e.g. storms, flooding, high winds, heavy snow, blizzards) might impact travel safety or access to the trailhead.
 3. STRICT CONSTRAINT MATCHING & NO SUBSTITUTION:
    - Filter by Starting Location, Time Window (half-day, full-day, weekend), Preferred Activities, Max Driving Duration, and Experience Level (Beginner, Intermediate, Advanced, Expert).
    - NEVER substitute a different activity type than what the user requested. If the user requested only "Snowboarding/Skiing", only recommend snowboarding/skiing. If no matching activities exist for the user's selected activity types, you must return an empty "activities" array. Do NOT relax the activity type preference to suggest alternative activities like hiking.
@@ -85,7 +85,7 @@ export const RESPONSE_SCHEMA = {
           warnings: {
             type: "ARRAY",
             items: { type: "STRING" },
-            description: "Active alerts, weather cautions, or safety warnings"
+            description: "Active safety alerts, trail closures, terrain hazards, or specific gear requirements. Do NOT include general weather conditions, rain probabilities, temperatures, or general highway traffic (which are handled programmatically), unless severe weather (storms, flooding, high winds, blizzards, etc.) might impact access or travel to the trailhead."
           },
           relaxedConstraints: {
             type: "ARRAY",
