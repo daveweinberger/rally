@@ -18,7 +18,6 @@
   "hosting": {
     "public": "dist",
     "predeploy": [
-      "npm run increment-version",
       "npm run build"
     ],
     "ignore": [
