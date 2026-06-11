@@ -1,4 +1,4 @@
-import { onCall } from 'firebase-functions/v2/https';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getRecommendations, getRefinementStream, getRecentTips } from './src/gemini.js';
 import { computeRoute } from './src/routes.js';
@@ -9,6 +9,14 @@ import { adjustItinerary } from './src/itinerary.js';
 if (getApps().length === 0) {
   initializeApp();
 }
+
+// Telemetry for tracking instance count, cold starts, and request lifecycle
+const INSTANCE_ID = Math.random().toString(36).substring(2, 10);
+let instanceRequestCount = 0;
+console.log(`[Lifecycle] Cloud Function instance ${INSTANCE_ID} initialized (Cold Start).`);
+
+// App Check should not be enforced when running locally in the Firebase Emulator
+const ENFORCE_APP_CHECK = process.env.FUNCTIONS_EMULATOR !== 'true';
 
 /**
  * Resolves routing data for an activity using placeId or coordinates, falling back to name+location if needed.
@@ -45,9 +53,39 @@ async function resolveRouteData(origin, activity) {
  * Main adventure search function.
  * Streams status updates and then the final enriched activities.
  */
-export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request, response) => {
+export const searchAdventures = onCall({ 
+  region: 'us-central1', 
+  timeoutSeconds: 120,
+  maxInstances: 10,
+  enforceAppCheck: ENFORCE_APP_CHECK 
+}, async (request, response) => {
+  instanceRequestCount++;
+  console.log(`[Telemetry] Instance ID: ${INSTANCE_ID} | Request Count: ${instanceRequestCount} | Handling function: searchAdventures`);
+
   const constraints = request.data;
   const acceptsStreaming = request.acceptsStreaming;
+
+  // Validate constraints
+  if (!constraints || typeof constraints !== 'object') {
+    throw new HttpsError('invalid-argument', 'Request data must be a valid constraints object.');
+  }
+  if (typeof constraints.startLocation !== 'string' || constraints.startLocation.trim().length === 0 || constraints.startLocation.length > 200) {
+    throw new HttpsError('invalid-argument', 'startLocation must be a non-empty string under 200 characters.');
+  }
+  if (constraints.startCoords) {
+    if (typeof constraints.startCoords.latitude !== 'number' || typeof constraints.startCoords.longitude !== 'number') {
+      throw new HttpsError('invalid-argument', 'startCoords must contain numeric latitude and longitude.');
+    }
+  }
+  if (constraints.notes && (typeof constraints.notes !== 'string' || constraints.notes.length > 1000)) {
+    throw new HttpsError('invalid-argument', 'notes must be a string under 1000 characters.');
+  }
+  if (constraints.activities && !Array.isArray(constraints.activities)) {
+    throw new HttpsError('invalid-argument', 'activities must be an array.');
+  }
+  if (constraints.activities && constraints.activities.some(act => typeof act !== 'string' || act.length > 50)) {
+    throw new HttpsError('invalid-argument', 'activities must only contain strings under 50 characters.');
+  }
 
   console.log("Starting searchAdventures with constraints:", constraints);
 
@@ -173,8 +211,35 @@ export const searchAdventures = onCall({ region: 'us-central1', timeoutSeconds: 
  * Refinement Chat function.
  * Streams natural language response character-by-character from Gemini.
  */
-export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (request) => {
-  const { history, message, constraints } = request.data;
+export const refineAdventure = onCall({ 
+  region: 'us-central1', 
+  timeoutSeconds: 120,
+  maxInstances: 10,
+  enforceAppCheck: ENFORCE_APP_CHECK 
+}, async (request) => {
+  instanceRequestCount++;
+  console.log(`[Telemetry] Instance ID: ${INSTANCE_ID} | Request Count: ${instanceRequestCount} | Handling function: refineAdventure`);
+
+  const { history, message, constraints } = request.data || {};
+
+  // Validate inputs
+  if (typeof message !== 'string' || message.trim().length === 0 || message.length > 2000) {
+    throw new HttpsError('invalid-argument', 'message must be a non-empty string under 2000 characters.');
+  }
+  if (history && (!Array.isArray(history) || history.length > 20)) {
+    throw new HttpsError('invalid-argument', 'history must be an array of length 20 or less.');
+  }
+  if (history && history.some(msg => !msg || typeof msg.content !== 'string' || msg.content.length > 5000)) {
+    throw new HttpsError('invalid-argument', 'history messages must contain strings under 5000 characters.');
+  }
+  if (constraints) {
+    if (typeof constraints.startLocation !== 'string' || constraints.startLocation.length > 200) {
+      throw new HttpsError('invalid-argument', 'startLocation must be a string under 200 characters.');
+    }
+    if (constraints.notes && (typeof constraints.notes !== 'string' || constraints.notes.length > 1000)) {
+      throw new HttpsError('invalid-argument', 'notes must be a string under 1000 characters.');
+    }
+  }
 
   console.log("Starting refineAdventure chat refinement. Message:", message);
 
@@ -247,8 +312,31 @@ export const refineAdventure = onCall({ region: 'us-central1', timeoutSeconds: 1
 /**
  * Cloud Function to fetch live recent tips/trail reports for a single activity.
  */
-export const fetchRecentTips = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (request) => {
-  const { activityName, location, latitude, longitude } = request.data;
+export const fetchRecentTips = onCall({ 
+  region: 'us-central1', 
+  timeoutSeconds: 60,
+  maxInstances: 10,
+  enforceAppCheck: ENFORCE_APP_CHECK 
+}, async (request) => {
+  instanceRequestCount++;
+  console.log(`[Telemetry] Instance ID: ${INSTANCE_ID} | Request Count: ${instanceRequestCount} | Handling function: fetchRecentTips`);
+
+  const { activityName, location, latitude, longitude } = request.data || {};
+
+  // Validate inputs
+  if (typeof activityName !== 'string' || activityName.trim().length === 0 || activityName.length > 200) {
+    throw new HttpsError('invalid-argument', 'activityName must be a non-empty string under 200 characters.');
+  }
+  if (typeof location !== 'string' || location.trim().length === 0 || location.length > 200) {
+    throw new HttpsError('invalid-argument', 'location must be a non-empty string under 200 characters.');
+  }
+  if (latitude !== undefined && (typeof latitude !== 'number' || isNaN(latitude))) {
+    throw new HttpsError('invalid-argument', 'latitude must be a numeric value.');
+  }
+  if (longitude !== undefined && (typeof longitude !== 'number' || isNaN(longitude))) {
+    throw new HttpsError('invalid-argument', 'longitude must be a numeric value.');
+  }
+
   console.log(`Starting fetchRecentTips for: ${activityName} (${location})`);
   
   try {

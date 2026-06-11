@@ -76,44 +76,19 @@ ${generalExplanation}`;
         return list;
       });
     } catch (err) {
-      console.error("Adventure chat refinement failed:", err);
-      
-      // Fallback to client-side simulated chat telemetry during local development
-      if (import.meta.env.DEV) {
-        console.warn("Firebase Emulator offline. Simulating mock chat refinement client-side.");
-        try {
-          const finalResult = await simulateMockRefinementStream((chunk) => {
-            setMessages(prev => {
-              const list = [...prev];
-              list[list.length - 1] = {
-                ...list[list.length - 1],
-                content: list[list.length - 1].content + chunk
-              };
-              return list;
-            });
-          });
-          
-          if (finalResult.results && finalResult.results.length > 0 && onUpdateResults) {
-            onUpdateResults(finalResult.results, finalResult.generalExplanation, finalResult.groundingMetadata);
-          }
-          
-          setMessages(prev => {
-            const list = [...prev];
-            list[list.length - 1] = {
-              role: 'model',
-              content: finalResult.text,
-              groundingMetadata: finalResult.groundingMetadata
-            };
-            return list;
-          });
-          setIsStreaming(false);
-          return;
-        } catch (simErr) {
-          console.error("Mock chat simulation failed:", simErr);
-        }
+      let verboseError = err.message || err.toString();
+      if (err.code) {
+        verboseError = `[${err.code}] ${verboseError}`;
+      }
+      if (err.details) {
+        const detailsStr = typeof err.details === 'object' ? JSON.stringify(err.details, null, 2) : err.details;
+        verboseError += `\n\nDetails:\n${detailsStr}`;
+      }
+      if (import.meta.env.DEV && (err.message?.includes('Failed to fetch') || err.message?.includes('internal') || err.message?.includes('Failed to get App Check token'))) {
+        verboseError += '\n\nTroubleshooting Tip (Local Dev): Ensure that your Firebase Local Emulator Suite is running (`npx firebase emulators:start`) and check that your API keys / App Check settings are configured correctly.';
       }
 
-      setError(err.message || 'Failed to refine recommendation.');
+      setError(verboseError);
       // Remove placeholder
       setMessages(prev => prev.slice(0, -1));
     } finally {

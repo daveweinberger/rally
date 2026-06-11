@@ -45,14 +45,18 @@ export const getUpcomingDays = () => {
   return days;
 };
 
+
+
 export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
+        setFocusedIndex(-1);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -61,13 +65,73 @@ export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
+  const handleTriggerClick = () => {
+    const nextOpen = !isOpen;
+    setIsOpen(nextOpen);
+    if (nextOpen) {
+      const selectedIdx = options.findIndex(opt => opt.value === value);
+      setFocusedIndex(selectedIdx >= 0 ? selectedIdx : 0);
+    } else {
+      setFocusedIndex(-1);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        setIsOpen(true);
+        const selectedIdx = options.findIndex(opt => opt.value === value);
+        setFocusedIndex(selectedIdx >= 0 ? selectedIdx : 0);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => (prev + 1) % options.length);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => (prev - 1 + options.length) % options.length);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < options.length) {
+          onChange(options[focusedIndex].value);
+          setIsOpen(false);
+          setFocusedIndex(-1);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        document.getElementById(id)?.focus();
+        break;
+      case 'Tab':
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="custom-dropdown-container" ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
       <button
         id={id}
         type="button"
         className="glass-input custom-dropdown-trigger"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleTriggerClick}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={`${id}-listbox`}
+        aria-activedescendant={isOpen && focusedIndex >= 0 ? `${id}-opt-${focusedIndex}` : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -87,6 +151,8 @@ export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
 
       {isOpen && (
         <div
+          id={`${id}-listbox`}
+          role="listbox"
           className="custom-dropdown-menu"
           style={{
             position: 'absolute',
@@ -106,21 +172,26 @@ export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
             animation: 'dropdownFadeIn 0.15s ease both'
           }}
         >
-          {options.map(opt => {
+          {options.map((opt, idx) => {
             const isSelected = opt.value === value;
+            const isFocused = focusedIndex === idx;
             return (
               <div
+                id={`${id}-opt-${idx}`}
                 key={opt.value}
+                role="option"
+                aria-selected={isSelected}
                 onClick={() => {
                   onChange(opt.value);
                   setIsOpen(false);
+                  setFocusedIndex(-1);
                 }}
                 className={`custom-dropdown-option ${isSelected ? 'active' : ''}`}
                 style={{
                   padding: '0.75rem 1.15rem',
                   fontSize: '0.9rem',
                   color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                  background: isSelected ? 'var(--accent-moss)' : 'transparent',
+                  background: isSelected ? 'var(--accent-moss)' : (isFocused ? 'rgba(255, 255, 255, 0.08)' : 'transparent'),
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                   display: 'flex',
@@ -128,10 +199,11 @@ export function CustomDropdown({ id, value, options, onChange, icon: Icon }) {
                   fontWeight: isSelected ? 600 : 500
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                  if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  setFocusedIndex(idx);
                 }}
                 onMouseLeave={(e) => {
-                  if (!isSelected) e.target.style.background = 'transparent';
+                  if (!isSelected) e.currentTarget.style.background = 'transparent';
                 }}
               >
                 {opt.label}
@@ -148,6 +220,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef(null);
   const customInputRef = useRef(null);
 
@@ -157,6 +230,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
         setIsOpen(false);
         setShowCustomInput(false);
         setCustomInput('');
+        setFocusedIndex(-1);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -183,6 +257,77 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
       onAddCustom(trimmed);
       setCustomInput('');
       setShowCustomInput(false);
+      // Put focus back onto the dropdown trigger
+      document.getElementById('activities-dropdown-trigger')?.focus();
+    }
+  };
+
+  const dropdownItems = [
+    ...visibleOptions.map(opt => ({ type: 'option', id: opt.id, label: opt.label, isCustom: false })),
+    ...customActivities.map(ca => ({ type: 'custom', id: ca, label: ca, isCustom: true })),
+    ...(!showCustomInput ? [{ type: 'other', id: 'other-trigger', label: 'Other...' }] : [])
+  ];
+
+  const handleTriggerClick = () => {
+    const nextOpen = !isOpen;
+    setIsOpen(nextOpen);
+    if (nextOpen) {
+      setFocusedIndex(0);
+    } else {
+      setFocusedIndex(-1);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        setIsOpen(true);
+        setFocusedIndex(0);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => (prev + 1) % dropdownItems.length);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => (prev - 1 + dropdownItems.length) % dropdownItems.length);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < dropdownItems.length) {
+          const item = dropdownItems[focusedIndex];
+          if (item.type === 'option') {
+            onToggle(item.id);
+          } else if (item.type === 'custom') {
+            onRemoveCustom(item.id);
+            setFocusedIndex(prev => {
+              const newLen = dropdownItems.length - 1;
+              if (newLen <= 0) return -1;
+              return Math.min(prev, newLen - 1);
+            });
+          } else if (item.type === 'other') {
+            setShowCustomInput(true);
+          }
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        document.getElementById('activities-dropdown-trigger')?.focus();
+        break;
+      case 'Tab':
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        break;
+      default:
+        break;
     }
   };
 
@@ -194,13 +339,12 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
         role="button"
         tabIndex={0}
         className="glass-input custom-dropdown-trigger"
-        onClick={() => setIsOpen(!isOpen)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setIsOpen(!isOpen);
-          }
-        }}
+        onClick={handleTriggerClick}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls="activities-listbox"
+        aria-activedescendant={isOpen && focusedIndex >= 0 ? `activities-opt-${focusedIndex}` : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -249,6 +393,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
                   <span
                     role="button"
                     tabIndex={0}
+                    className="touch-target-44"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isCustom) {
@@ -307,6 +452,8 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
       {/* Dropdown menu */}
       {isOpen && (
         <div
+          id="activities-listbox"
+          role="listbox"
           className="custom-dropdown-menu"
           style={{
             position: 'absolute',
@@ -326,21 +473,25 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
             animation: 'dropdownFadeIn 0.15s ease both'
           }}
         >
-          {visibleOptions.map(opt => {
+          {visibleOptions.map((opt, idx) => {
             const isSelected = selectedActivities.includes(opt.id);
+            const isFocused = focusedIndex === idx;
             const seasonStatus = getActivitySeasonStatus(opt.id, targetDay, startCoords?.latitude, startLocation);
             const isShoulder = seasonStatus === 'shoulder';
 
             return (
               <div
+                id={`activities-opt-${idx}`}
                 key={opt.id}
+                role="option"
+                aria-selected={isSelected}
                 onClick={() => onToggle(opt.id)}
                 className="custom-dropdown-option"
                 style={{
                   padding: '0.7rem 1rem',
                   fontSize: '0.9rem',
                   color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  background: 'transparent',
+                  background: isFocused ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                   display: 'flex',
@@ -349,8 +500,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
                   fontWeight: isSelected ? 600 : 500,
                   borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={() => setFocusedIndex(idx)}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {opt.label}
@@ -378,41 +528,47 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
           })}
 
           {/* Custom activities in dropdown */}
-          {customActivities.map(ca => (
-            <div
-              key={ca}
-              onClick={() => onRemoveCustom(ca)}
-              className="custom-dropdown-option"
-              style={{
-                padding: '0.7rem 1rem',
-                fontSize: '0.9rem',
-                color: 'var(--text-primary)',
-                background: 'transparent',
-                cursor: 'pointer',
-                transition: 'background 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontWeight: 600,
-                borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {ca}
-                <span style={{
-                  fontSize: '0.62rem',
-                  color: 'var(--text-muted)',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  padding: '1px 5px',
-                  borderRadius: '4px',
-                  fontWeight: 600
-                }}>Custom</span>
-              </span>
-              <Check size={16} style={{ color: 'var(--accent-moss)', flexShrink: 0 }} />
-            </div>
-          ))}
+          {customActivities.map((ca, idx) => {
+            const optIdx = visibleOptions.length + idx;
+            const isFocused = focusedIndex === optIdx;
+            return (
+              <div
+                id={`activities-opt-${optIdx}`}
+                key={ca}
+                role="option"
+                aria-selected={true}
+                onClick={() => onRemoveCustom(ca)}
+                className="custom-dropdown-option"
+                style={{
+                  padding: '0.7rem 1rem',
+                  fontSize: '0.9rem',
+                  color: 'var(--text-primary)',
+                  background: isFocused ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontWeight: 600,
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                }}
+                onMouseEnter={() => setFocusedIndex(optIdx)}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {ca}
+                  <span style={{
+                    fontSize: '0.62rem',
+                    color: 'var(--text-muted)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    fontWeight: 600
+                  }}>Custom</span>
+                </span>
+                <Check size={16} style={{ color: 'var(--accent-moss)', flexShrink: 0 }} />
+              </div>
+            );
+          })}
 
           {/* Divider */}
           <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '0' }} />
@@ -420,13 +576,16 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
           {/* Other / Custom input */}
           {!showCustomInput ? (
             <div
+              id={`activities-opt-${visibleOptions.length + customActivities.length}`}
+              role="option"
+              aria-selected={false}
               onClick={() => setShowCustomInput(true)}
               className="custom-dropdown-option"
               style={{
                 padding: '0.7rem 1rem',
                 fontSize: '0.9rem',
                 color: 'var(--text-muted)',
-                background: 'transparent',
+                background: focusedIndex === (visibleOptions.length + customActivities.length) ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
                 cursor: 'pointer',
                 transition: 'background 0.15s ease',
                 display: 'flex',
@@ -435,8 +594,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
                 fontWeight: 500,
                 fontStyle: 'italic'
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={() => setFocusedIndex(visibleOptions.length + customActivities.length)}
             >
               <Plus size={14} style={{ color: 'var(--text-muted)' }} />
               Other...
@@ -461,6 +619,9 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
                   if (e.key === 'Escape') {
                     setShowCustomInput(false);
                     setCustomInput('');
+                    setFocusedIndex(visibleOptions.length + customActivities.length);
+                    // Return focus to trigger
+                    document.getElementById('activities-dropdown-trigger')?.focus();
                   }
                 }}
                 placeholder="Type an activity..."
@@ -506,10 +667,32 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
 
 export const formatNominatimName = (item) => {
   const address = item.address || {};
-  const city = address.city || address.town || address.village || address.hamlet || address.suburb;
+  // Prefer the most specific named place: if the result itself is a suburb/neighbourhood/borough,
+  // use that rather than the parent city (e.g. show "Brooklyn" not "New York City").
+  const specificName =
+    address.suburb ||
+    address.neighbourhood ||
+    address.borough ||
+    null;
+  const generalName =
+    address.city ||
+    address.town ||
+    address.village ||
+    address.hamlet ||
+    null;
+  // Use the specific name only when the result type suggests it is the primary subject
+  // (i.e. the Nominatim type/category is a suburb, neighbourhood, or borough).
+  const isSuburbResult =
+    item.type === 'suburb' ||
+    item.type === 'neighbourhood' ||
+    item.type === 'borough' ||
+    item.addresstype === 'suburb' ||
+    item.addresstype === 'neighbourhood' ||
+    item.addresstype === 'borough';
+  const city = (isSuburbResult && specificName) ? specificName : (generalName || specificName);
   const state = address.state;
   const country = address.country;
-  
+
   if (city && state) {
     return `${city}, ${state}`;
   }
@@ -519,7 +702,7 @@ export const formatNominatimName = (item) => {
   return item.display_name.split(',').slice(0, 3).join(',').trim();
 };
 
-export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus, submitLabel, onCancel, visibleField }) {
+export default function InputPanel({ onSubmit, initialConstraints, autoFocusField, onClearAutoFocus, submitLabel, onCancel, visibleField, isLoading = false }) {
   const upcomingDays = getUpcomingDays();
   const showAll = !visibleField;
   
@@ -805,7 +988,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       {/* Starting Location */}
       {(showAll || visibleField === 'location') && (
         <div className="flex-col" ref={locationRef} style={{ position: 'relative' }}>
-          <label className="glass-label">
+          <label className="glass-label" htmlFor="location-input">
             <span>Starting Point</span>
             {startCoords && (
               <span className="glass-label-badge">
@@ -846,6 +1029,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
                 padding: '6px'
               }}
               title="Use current GPS location"
+              aria-label="Use current GPS location"
             >
               <Locate size={16} className={isLocating ? 'pulse-green' : ''} />
             </button>
@@ -872,9 +1056,17 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
                 animation: 'dropdownFadeIn 0.15s ease both'
               }}
             >
-              {suggestions.map((item, idx) => {
-                const displayName = formatNominatimName(item);
-                return (
+              {suggestions
+                .reduce((acc, item) => {
+                  const displayName = formatNominatimName(item);
+                  if (!acc.seen.has(displayName)) {
+                    acc.seen.add(displayName);
+                    acc.items.push({ item, displayName });
+                  }
+                  return acc;
+                }, { seen: new Set(), items: [] })
+                .items
+                .map(({ item, displayName }, idx) => (
                   <div
                     key={idx}
                     onClick={() => handleSelectSuggestion(item)}
@@ -892,8 +1084,8 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
                   >
                     {displayName}
                   </div>
-                );
-              })}
+                ))
+              }
             </div>
           )}
         </div>
@@ -903,7 +1095,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       {showAll ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
           <div className="flex-col">
-            <label className="glass-label">
+            <label className="glass-label" htmlFor="duration-dropdown-trigger">
               <span>Available Time</span>
             </label>
             <CustomDropdown
@@ -916,7 +1108,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
           </div>
 
           <div className="flex-col">
-            <label className="glass-label">
+            <label className="glass-label" htmlFor="drive-dropdown-trigger">
               <span>Max Driving Time</span>
             </label>
             <CustomDropdown
@@ -929,7 +1121,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
           </div>
 
           <div className="flex-col">
-            <label className="glass-label">
+            <label className="glass-label" htmlFor="date-dropdown-trigger">
               <span>Adventure Date</span>
             </label>
             <CustomDropdown
@@ -945,7 +1137,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
         <>
           {visibleField === 'duration' && (
             <div className="flex-col">
-              <label className="glass-label">
+              <label className="glass-label" htmlFor="duration-dropdown-trigger">
                 <span>Available Time</span>
               </label>
               <CustomDropdown
@@ -960,7 +1152,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
 
           {visibleField === 'drive' && (
             <div className="flex-col">
-              <label className="glass-label">
+              <label className="glass-label" htmlFor="drive-dropdown-trigger">
                 <span>Max Driving Time</span>
               </label>
               <CustomDropdown
@@ -975,7 +1167,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
 
           {visibleField === 'date' && (
             <div className="flex-col">
-              <label className="glass-label">
+              <label className="glass-label" htmlFor="date-dropdown-trigger">
                 <span>Adventure Date</span>
               </label>
               <CustomDropdown
@@ -993,7 +1185,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       {/* Activities Dropdown */}
       {(showAll || visibleField === 'activities') && (
         <div className="flex-col">
-          <label className="glass-label">
+          <label className="glass-label" htmlFor="activities-dropdown-trigger">
             <span>Preferred Activities</span>
           </label>
           <MultiSelectActivityDropdown
@@ -1033,10 +1225,10 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       {/* Experience Level Segmented Control */}
       {(showAll || visibleField === 'experience') && (
         <div className="flex-col">
-          <label className="glass-label">
+          <label id="experience-label" className="glass-label">
             <span>Your Experience Level</span>
           </label>
-          <div id="experience-container" style={{
+          <div id="experience-container" aria-labelledby="experience-label" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '4px',
@@ -1077,7 +1269,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       {/* Notes Field */}
       {(showAll || visibleField === 'notes') && (
         <div className="flex-col">
-          <label className="glass-label">
+          <label className="glass-label" htmlFor="notes-input">
             <span>Special Requests or Notes</span>
           </label>
           <textarea
@@ -1093,7 +1285,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
       )}
 
       {validationError && (
-        <div style={{
+        <div role="alert" style={{
           color: '#e27d7d',
           fontSize: '0.8rem',
           display: 'flex',
@@ -1134,18 +1326,19 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
         )}
         <button
           type="submit"
-          className={`glass-btn ${isFormComplete ? 'glass-btn-primary' : ''}`}
+          disabled={isLoading}
+          className={`glass-btn ${isFormComplete && !isLoading ? 'glass-btn-primary' : ''}`}
           style={{
             flex: onCancel ? 2 : 1,
             width: onCancel ? 'auto' : '100%',
             padding: '0.9rem',
             fontSize: '0.95rem',
-            background: isFormComplete ? 'var(--accent-moss)' : 'rgba(255, 255, 255, 0.05)',
-            color: isFormComplete ? '#ffffff' : 'var(--text-secondary)',
-            border: isFormComplete ? '1px solid rgba(72, 178, 124, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: isFormComplete ? '0 4px 14px rgba(72, 178, 124, 0.25)' : 'none',
-            cursor: 'pointer',
-            opacity: isFormComplete ? 1 : 0.7,
+            background: isFormComplete && !isLoading ? 'var(--accent-moss)' : 'rgba(255, 255, 255, 0.05)',
+            color: isFormComplete && !isLoading ? '#ffffff' : 'var(--text-secondary)',
+            border: isFormComplete && !isLoading ? '1px solid rgba(72, 178, 124, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: isFormComplete && !isLoading ? '0 4px 14px rgba(72, 178, 124, 0.25)' : 'none',
+            cursor: isLoading ? 'not-allowed' : (isFormComplete ? 'pointer' : 'default'),
+            opacity: isLoading ? 0.5 : (isFormComplete ? 1 : 0.7),
             transition: 'all 0.2s ease',
             display: 'inline-flex',
             alignItems: 'center',

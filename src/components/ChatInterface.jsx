@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, CornerDownRight, ChevronDown, ChevronUp } from 'lucide-react';
 import Attribution from './Attribution.jsx';
+import DOMPurify from 'dompurify';
 
 // Simple lightweight markdown formatter to keep bundle size small and loading speed instant
 function formatMarkdown(text) {
@@ -69,13 +70,23 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
     <div className="glass-card flex-col gap-md">
       {/* Collapsible Header */}
       <div 
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
         className="row justify-between align-center" 
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
         style={{ 
           cursor: 'pointer',
           paddingBottom: isOpen ? '0.75rem' : '0', 
           borderBottom: isOpen ? '1px solid var(--border-muted)' : 'none',
-          transition: 'padding 0.2s ease'
+          transition: 'padding 0.2s ease',
+          outline: 'none'
         }}
       >
         <div className="row align-center gap-sm">
@@ -86,6 +97,8 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
         </div>
         <button 
           type="button" 
+          tabIndex={-1}
+          aria-hidden="true"
           className="glass-btn glass-btn-outline" 
           style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px' }}
         >
@@ -140,7 +153,7 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
                       <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                     ) : (
                       <div 
-                        dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} 
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMarkdown(msg.content)) }} 
                         style={{ wordBreak: 'break-word' }}
                       />
                     )}
@@ -195,8 +208,8 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
                 disabled={isStreaming}
                 onClick={() => handleChipClick(chip)}
                 style={{
-                  padding: '5px 12px',
-                  fontSize: '0.78rem',
+                  padding: '8px 14px',
+                  fontSize: '0.82rem',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '8px',
                   background: 'rgba(255, 255, 255, 0.04)',
@@ -206,7 +219,8 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
                   alignItems: 'center',
                   gap: '4px',
                   transition: 'all 0.15s ease',
-                  opacity: isStreaming ? 0.5 : 1
+                  opacity: isStreaming ? 0.5 : 1,
+                  minHeight: '36px'
                 }}
               >
                 <CornerDownRight size={10} color="var(--accent-moss)" />
@@ -225,11 +239,13 @@ export default function ChatInterface({ messages, sendMessage, isStreaming, erro
               placeholder={isStreaming ? "System generating response..." : "Refine your options..."}
               className="glass-input"
               style={{ flexGrow: 1 }}
+              aria-label="Type a message to refine your adventure results"
             />
             <button 
               type="submit" 
               className="glass-btn glass-btn-primary" 
               disabled={isStreaming || !input.trim()}
+              aria-label="Send message"
             >
               <Send size={14} />
             </button>

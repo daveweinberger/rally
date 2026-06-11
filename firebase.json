@@ -26,6 +26,37 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com https://www.google.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.cloudfunctions.net wss://*.firebaseio.com https://nominatim.openstreetmap.org https://firebaseinstallations.googleapis.com https://identitytoolkit.googleapis.com https://www.google-analytics.com https://www.google.com; img-src 'self' data: https://*.google.com https://*.gstatic.com https://*.openstreetmap.org; frame-src 'self' https://www.google.com https://recaptcha.google.com;"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "geolocation=(self), camera=(), microphone=()"
+          },
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains; preload"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
@@ -41,7 +72,7 @@
       "port": 8080
     },
     "hosting": {
-      "port": 5000
+      "port": 5005
     },
     "ui": {
       "enabled": true,

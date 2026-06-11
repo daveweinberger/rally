@@ -298,20 +298,10 @@ function filterActivitiesByExperienceLevel(activities, requestedLevel) {
   const reqVal = DIFFICULTY_LEVELS[requestedLevel.toLowerCase()];
   if (!reqVal) return activities;
 
-  const allowed = activities.filter(act => {
+  // Enforce upper bound (never allow difficulty > requested level)
+  return activities.filter(act => {
     const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
     if (!actVal) return true;
     return actVal <= reqVal;
   });
-
-  const exactMatches = allowed.filter(act => {
-    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
-    return actVal === reqVal;
-  });
-
-  if (exactMatches.length > 0) {
-    return exactMatches;
-  }
-
-  return allowed;
 }

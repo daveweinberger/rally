@@ -6,7 +6,16 @@ export default function ResultCard({ activity, rank, onSelect }) {
   return (
     <div 
       className="glass-card glass-card-interactive flex-col gap-md"
+      role="button"
+      tabIndex={0}
+      aria-label={`View details for ${activity.name}`}
       onClick={() => onSelect(activity)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(activity);
+        }
+      }}
       style={{
         width: '100%',
         animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both',
@@ -101,6 +110,7 @@ export default function ResultCard({ activity, rank, onSelect }) {
         </span>
         <button 
           className="glass-btn glass-btn-outline" 
+          tabIndex={-1}
           onClick={(e) => {
             e.stopPropagation(); // prevent double trigger
             onSelect(activity);

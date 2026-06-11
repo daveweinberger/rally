@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getAnalytics, isSupported } from 'firebase/analytics';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Load values from Vite env vars, fallback to placeholders for local dev
 const firebaseConfig = {
@@ -15,6 +16,25 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app, 'us-central1');
+
+// Initialize App Check if site key is provided and we aren't using the emulator
+if (typeof window !== 'undefined') {
+  const siteKey = import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY;
+  const isEmulator = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true';
+  
+  if (siteKey && !isEmulator) {
+    if (import.meta.env.DEV) {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log("Firebase App Check initialized successfully");
+  } else {
+    console.warn("VITE_FIREBASE_APP_CHECK_SITE_KEY is not defined. App Check is disabled.");
+  }
+}
 
 let analytics = null;
 isSupported().then((supported) => {

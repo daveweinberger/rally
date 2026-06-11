@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Compass, Loader2 } from 'lucide-react';
+import { Compass, Loader2, XCircle } from 'lucide-react';
 
 const detectLocale = (startLocation) => {
   const loc = (startLocation || '').toLowerCase();
   
   const containsWord = (word) => {
+    // eslint-disable-next-line no-useless-escape
     const regex = new RegExp(`\\b${word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
     return regex.test(loc);
   };
@@ -232,7 +233,7 @@ const getChecklistStep3 = (startLocation) => {
   return `Calculating travel times and current traffic timelines`;
 };
 
-export default function LoadingState({ status, statusMessage, constraints }) {
+export default function LoadingState({ status, statusMessage, constraints, onCancel }) {
   const [dynamicMessages, setDynamicMessages] = useState([]);
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
 
@@ -334,7 +335,7 @@ export default function LoadingState({ status, statusMessage, constraints }) {
         </div>
         
         {/* Animated text line */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div role="status" aria-live="polite" style={{ flex: 1, overflow: 'hidden' }}>
           {displayItems[currentItemIndex] && (
             <span 
               key={currentItemIndex} 
@@ -353,6 +354,31 @@ export default function LoadingState({ status, statusMessage, constraints }) {
           )}
         </div>
       </div>
+
+      {onCancel && (
+        <div className="row justify-center" style={{ marginTop: '0.5rem' }}>
+          <button
+            onClick={onCancel}
+            className="glass-btn glass-btn-outline"
+            style={{
+              padding: '0.6rem 1.25rem',
+              fontSize: '0.85rem',
+              color: '#e27d7d',
+              borderColor: 'rgba(226, 125, 125, 0.25)',
+              background: 'rgba(226, 125, 125, 0.04)',
+              cursor: 'pointer',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <XCircle size={16} />
+            Cancel Search
+          </button>
+        </div>
+      )}
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes spin {

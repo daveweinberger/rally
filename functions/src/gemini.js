@@ -11,6 +11,38 @@ function getGenAIClient() {
   return new GoogleGenAI({ apiKey });
 }
 
+const BLOCKED_TOKENS = [
+  'ignore', 'disregard', 'override', 'system', 'prompt-injection',
+  '/goal', '/schedule', '/browser', '/teamwork-preview'
+];
+
+const REFUSAL_MESSAGES = [
+  "Nice try! I can't help you with that, unfortunately.",
+  "I see what you did there, but I'm sticking to adventure recommendations.",
+  "I'm an outdoor guide, not a calculator or a trick-shot artist.",
+  "Let's get back on the trail. I can't process that request.",
+  "That's off the beaten path! I can only help with your adventure planning."
+];
+
+function getRandomRefusal() {
+  return REFUSAL_MESSAGES[Math.floor(Math.random() * REFUSAL_MESSAGES.length)];
+}
+
+function isAllowedRequest(sanitized) {
+  const lower = sanitized.toLowerCase();
+  return !BLOCKED_TOKENS.some(tok => lower.includes(tok));
+}
+
+// Helper to sanitize inputs to prevent prompt injection: strips XML tags and quotes/backticks
+function sanitizeInput(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/<\/?[^>]+(>|$)/g, "") // Remove any XML-like tags (e.g. </user_notes>)
+    .replace(/[`'"\\]/g, "") // Remove backticks, quotes, backslashes to avoid breaking JSON structure
+    .replace(/\s+/g, " ") // Collapse whitespace
+    .trim();
+}
+
 // Mock responses for Seattle area when Gemini key is missing
 const SEATTLE_MOCK = {
   activities: [
@@ -137,7 +169,17 @@ const GENERIC_MOCK = (location) => ({
  * @returns {Promise<object>}
  */
 export async function getRecommendations(constraints, startWeather) {
-  const ai = getGenAIClient();
+    // Basic runtime policy check for user-provided notes
+    const rawNotes = constraints.notes || '';
+    if (rawNotes && !isAllowedRequest(rawNotes)) {
+      console.warn("Blocked disallowed generate request:", rawNotes);
+      return {
+        activities: [],
+        generalExplanation: getRandomRefusal()
+      };
+    }
+
+    const ai = getGenAIClient();
   
   // Fallback to mock if API key is not set
   if (!ai) {
@@ -160,9 +202,10 @@ export async function getRecommendations(constraints, startWeather) {
     };
   }
 
+  const sanitizedStartLocation = sanitizeInput(constraints.startLocation || '');
   const locationString = constraints.startCoords 
-    ? `Coordinates Latitude ${constraints.startCoords.latitude}, Longitude ${constraints.startCoords.longitude} (${constraints.startLocation})`
-    : constraints.startLocation;
+    ? `Coordinates Latitude ${constraints.startCoords.latitude}, Longitude ${constraints.startCoords.longitude} (${sanitizedStartLocation})`
+    : sanitizedStartLocation;
   
   let weatherInfo = "";
   if (startWeather) {
@@ -174,15 +217,19 @@ export async function getRecommendations(constraints, startWeather) {
   }
 
   const schemaString = JSON.stringify(RESPONSE_SCHEMA, null, 2);
+  const sanitizedActivities = Array.isArray(constraints.activities)
+    ? constraints.activities.map(sanitizeInput).join(', ')
+    : sanitizeInput(constraints.activities || '');
+
   const prompt = `
 Recommend exactly 3 outdoor activities matching these user constraints:${weatherInfo}
 - Starting Location: ${locationString}
 - Target Date for Adventure: ${constraints.targetDay || 'Today'} (Evaluate trail conditions, highway traffic, and weather forecast specifically for this target date)
 - Time Window: ${constraints.timeWindow}
-- Preferred Activities: ${Array.isArray(constraints.activities) ? constraints.activities.join(', ') : constraints.activities}
+- Preferred Activities: <user_activities>${sanitizedActivities}</user_activities>
 - Max Driving Duration: ${constraints.maxDriveTime}
 - Experience Level: ${constraints.experienceLevel}
-- Free-form Notes: ${constraints.notes || 'None'}
+- Free-form Notes: <user_notes>${sanitizeInput(constraints.notes || 'None')}</user_notes>
 
 You MUST output ONLY a valid JSON object matching this schema. Do not output any other text or explanation. If you include Markdown code blocks (e.g. \`\`\`json ... \`\`\`), that is fine, but the JSON inside must be valid:
 ${schemaString}
@@ -248,6 +295,16 @@ ${schemaString}
  * @returns {Promise<object>} - Returns final accumulated response with grounding metadata
  */
 export async function getRefinementStream(history, newMessage, constraints) {
+  const sanitizedNewMessage = sanitizeInput(newMessage);
+  if (!isAllowedRequest(sanitizedNewMessage)) {
+    console.warn("Blocked disallowed refinement request:", newMessage);
+    return {
+      chatResponse: getRandomRefusal(),
+      activities: null,
+      generalExplanation: "Your request violated our safety policies.",
+      groundingMetadata: {}
+    };
+  }
   const ai = getGenAIClient();
 
   const contents = [];
@@ -263,9 +320,10 @@ export async function getRefinementStream(history, newMessage, constraints) {
   }
   
   for (const msg of historyExcludeLast) {
+    const isUser = msg.role === 'user';
     contents.push({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }]
+      role: isUser ? 'user' : 'model',
+      parts: [{ text: isUser ? `User request: <user_message>${sanitizeInput(msg.content)}</user_message>` : msg.content }]
     });
   }
 
@@ -314,7 +372,7 @@ export async function getRefinementStream(history, newMessage, constraints) {
   }
 
   const schemaString = JSON.stringify(REFINEMENT_SCHEMA, null, 2);
-  const formattedNewMessage = `User request: "${newMessage}"
+  const formattedNewMessage = `User request: <user_message>${sanitizeInput(newMessage)}</user_message>
 
 Please respond with a JSON object matching this schema:
 ${schemaString}
@@ -420,25 +478,12 @@ export function filterActivitiesByExperienceLevel(activities, requestedLevel) {
   const reqVal = DIFFICULTY_LEVELS[requestedLevel.toLowerCase()];
   if (!reqVal) return activities; // Unknown level, return unfiltered
 
-  // 1. Filter out activities higher than the requested level
-  const allowed = activities.filter(act => {
+  // Enforce upper bound (never allow difficulty > requested level)
+  return activities.filter(act => {
     const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
     if (!actVal) return true; // Keep unknown difficulties
     return actVal <= reqVal;
   });
-
-  // 2. Prioritize exact matches
-  const exactMatches = allowed.filter(act => {
-    const actVal = DIFFICULTY_LEVELS[(act.difficulty || '').toLowerCase()];
-    return actVal === reqVal;
-  });
-
-  if (exactMatches.length > 0) {
-    return exactMatches;
-  }
-
-  // 3. Fallback to lower difficulties only if no exact matches exist
-  return allowed;
 }
 
 /**
@@ -498,7 +543,8 @@ async function resolveUrl(url) {
     const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
 
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
+      redirect: 'manual',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
@@ -507,30 +553,147 @@ async function resolveUrl(url) {
     
     clearTimeout(timeoutId);
     
-    if (res.url && res.url !== url) {
-      return res.url;
+    const redirectUrl = res.headers.get('location');
+    if (redirectUrl) {
+      if (redirectUrl.startsWith('/')) {
+        const parsedUrl = new URL(url);
+        return parsedUrl.origin + redirectUrl;
+      }
+      return redirectUrl;
     }
   } catch (e) {
     console.error(`Error resolving redirect for URL: ${url}`, e);
-    // Fallback to GET if HEAD failed (some servers might block HEAD)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (res.url) return res.url;
-    } catch (e2) {
-      console.error(`Error resolving redirect via GET for URL: ${url}`, e2);
-    }
   }
   
   return url;
+}
+
+/**
+ * Derives a human-readable source name from a grounding chunk.
+ * Prefers the chunk's title (first meaningful word or site name portion),
+ * falling back to the cleaned hostname.
+ */
+function deriveSourceName(chunk) {
+  if (!chunk || !chunk.web) return null;
+  // If the chunk has a title, use the publication name portion.
+  // Titles are often like "Breakneck Ridge Closure - Daily Monroe" or "WTA Trip Report".
+  const title = chunk.web.title || '';
+  if (title) {
+    // Try to extract the site name after the last ' - ' or ' | ' separator
+    const separatorMatch = title.match(/[–—|\-]\s*([^|\-–—]+)\s*$/);
+    if (separatorMatch) {
+      const candidate = separatorMatch[1].trim();
+      if (candidate.length > 0 && candidate.length < 60) {
+        return candidate;
+      }
+    }
+    // Fall back to using the full title if it's short enough to be a site name
+    if (title.length < 40) return title;
+  }
+  // Fall back to hostname (e.g. "dailymonroe.com" -> "Daily Monroe")
+  try {
+    const host = new URL(chunk.web.uri).hostname.replace(/^www\./, '');
+    const domain = host.split('.')[0]; // e.g. "dailymonroe"
+    // Title-case the domain, splitting on camelCase and hyphens
+    return domain
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compares a potentially hallucinated/incorrect link from the model against
+ * actual Google Search Grounding sources from the same domain to correct it.
+ * Returns { link, source } with corrected values.
+ */
+function correctTipLink(tipLink, tipSource, groundingChunks, activityName) {
+  if (!tipLink || !groundingChunks || !Array.isArray(groundingChunks) || groundingChunks.length === 0) {
+    return { link: tipLink, source: tipSource };
+  }
+
+  try {
+    const tipUrl = new URL(tipLink);
+    const tipHost = tipUrl.hostname.toLowerCase().replace(/^www\./, ''); // e.g. "summitpost.org"
+    const tipPath = tipUrl.pathname.toLowerCase();
+
+    // Filter grounding chunks that have the same base domain/host
+    const candidates = groundingChunks.filter(chunk => {
+      if (!chunk.web || !chunk.web.uri) return false;
+      try {
+        const chunkUrl = new URL(chunk.web.uri);
+        const chunkHost = chunkUrl.hostname.toLowerCase().replace(/^www\./, '');
+        return chunkHost === tipHost || chunkHost.endsWith('.' + tipHost) || tipHost.endsWith('.' + chunkHost);
+      } catch {
+        return false;
+      }
+    });
+
+    if (candidates.length === 0) {
+      return { link: tipLink, source: tipSource };
+    }
+
+    if (candidates.length === 1) {
+      // Only one matching search source from this domain; use its verified URL and derive name
+      return {
+        link: candidates[0].web.uri,
+        source: deriveSourceName(candidates[0]) || tipSource
+      };
+    }
+
+    // Multiple search source candidates on this domain. Find the closest match.
+    const trailSlug = (activityName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); // e.g. "mailbox-peak"
+    
+    let bestCandidate = null;
+    let bestScore = -1;
+
+    for (const cand of candidates) {
+      let score = 0;
+      const candUri = cand.web.uri.toLowerCase();
+      const candTitle = (cand.web.title || '').toLowerCase();
+
+      // Score 1: Slug match in URL path
+      if (trailSlug && candUri.includes(trailSlug)) {
+        score += 10;
+      }
+
+      // Score 2: Match any segments of the path from tipLink
+      const tipPathSegments = tipPath.split('/').filter(s => s && isNaN(s) && s.length > 2);
+      for (const segment of tipPathSegments) {
+        if (candUri.includes(segment)) {
+          score += 5;
+        }
+      }
+
+      // Score 3: Match trail name in the title
+      if (activityName && candTitle.includes(activityName.toLowerCase())) {
+        score += 8;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = cand;
+      }
+    }
+
+    if (bestCandidate && bestScore > 0) {
+      return {
+        link: bestCandidate.web.uri,
+        source: deriveSourceName(bestCandidate) || tipSource
+      };
+    }
+
+    // Default to the first candidate if no scoring matches but we have candidates from the same domain
+    return {
+      link: candidates[0].web.uri,
+      source: deriveSourceName(candidates[0]) || tipSource
+    };
+  } catch (err) {
+    console.error("Error correcting tip link:", err);
+    return { link: tipLink, source: tipSource };
+  }
 }
 
 /**
@@ -594,6 +757,10 @@ ${schemaString}
       throw new Error("No text returned from Gemini recent tips query.");
     }
 
+    // Extract grounding metadata to correct links
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata || {};
+    const groundingChunks = groundingMetadata.groundingChunks || [];
+
     let parsedData;
     try {
       let cleanText = text.trim();
@@ -612,13 +779,15 @@ ${schemaString}
       throw new Error("Tips output was not in the expected JSON format.", { cause: parseErr });
     }
 
-    // Resolve any transient search grounding redirect URLs to their final destination
+    // Correct any hallucinated links and source names using grounding chunks,
+    // then resolve any transient redirects
     if (parsedData && parsedData.recentTips && Array.isArray(parsedData.recentTips)) {
       const resolvedTips = await Promise.all(
         parsedData.recentTips.map(async (tip) => {
           if (tip.link) {
-            const resolvedLink = await resolveUrl(tip.link);
-            return { ...tip, link: resolvedLink };
+            const corrected = correctTipLink(tip.link, tip.source, groundingChunks, activityName);
+            const resolvedLink = await resolveUrl(corrected.link);
+            return { ...tip, link: resolvedLink, source: corrected.source };
           }
           return tip;
         })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, MapPin, AlertTriangle, Route, ExternalLink, RefreshCw } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../utils/firebase.js';
@@ -41,6 +41,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
   const [tipsFetched, setTipsFetched] = useState(false);
   const [tipsError, setTipsError] = useState(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (activity) {
       setLocalItinerary(activity.itinerary || []);
@@ -98,6 +99,59 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
     };
   }, []);
 
+  const modalRef = useRef(null);
+
+  // Focus trap, Escape-dismiss, and focus restoration
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const modalElement = modalRef.current;
+    
+    if (modalElement) {
+      const focusableElements = modalElement.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus();
+      }
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!modalElement) return;
+        const focusableElements = modalElement.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) { // Shift + Tab
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else { // Tab
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
   const timeToMinutes = (timeStr) => {
     const [h, m] = timeStr.split(':').map(Number);
     return h * 60 + m;
@@ -126,14 +180,21 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+      <div 
+        ref={modalRef}
+        className="modal-container" 
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         {/* Modal Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-muted)', paddingBottom: '1rem' }}>
           <div className="flex-col" style={{ maxWidth: '85%' }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--accent-moss)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Adventure Details
             </span>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'none', margin: '4px 0 0 0' }}>
+            <h2 id="modal-title" style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'none', margin: '4px 0 0 0' }}>
               {activity.name}
             </h2>
             <div className="row align-center gap-sm" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '4px' }}>
@@ -143,6 +204,8 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
           </div>
           <button 
             onClick={onClose}
+            className="touch-target-44"
+            aria-label="Close details modal"
             style={{
               background: 'rgba(255, 255, 255, 0.06)',
               border: 'none',
@@ -156,8 +219,8 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
               color: 'var(--text-secondary)',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.12)'}
-            onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.06)'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
           >
             <X size={18} />
           </button>
@@ -318,14 +381,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                     const tipSource = typeof tip === 'object' ? tip.source : null;
                     const tipLink = typeof tip === 'object' ? tip.link : null;
 
-                    const isVerbatim = (() => {
-                      if (!tipSource) return false;
-                      const src = tipSource.toLowerCase();
-                      const dt = (tipDate || '').toLowerCase();
-                      const isGeneral = src.includes('general') || src.includes('season') || src.includes('knowledge') || src.includes('gemini') || dt.includes('general') || dt.includes('season');
-                      if (isGeneral) return false;
-                      return true;
-                    })();
+                    const isVerbatim = typeof tip === 'object' && tip.isVerbatim === true;
 
                     return (
                       <div 
@@ -356,7 +412,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                             {tipText}
                           </p>
                         )}
-                        {isVerbatim && (tipSource || tipDate) && (
+                        {(tipSource || tipDate) && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                             {tipSource && (
                               <>
@@ -391,50 +447,6 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                       </div>
                     );
                   })}
-                </div>
-              )}
-
-              {/* Skeleton loaders showing below the existing list while loading */}
-              {tipsLoading && (
-                <div className="flex-col gap-sm" style={{ gap: '10px', marginTop: localTips.length > 0 ? '12px' : '0' }}>
-                  {/* Subtle live fetching banner */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '0.75rem',
-                    color: 'var(--accent-moss)',
-                    background: 'rgba(72, 178, 124, 0.05)',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px dashed rgba(72, 178, 124, 0.25)',
-                    marginBottom: '4px'
-                  }}>
-                    <RefreshCw size={12} style={{ animation: 'spin 1.2s linear infinite' }} />
-                    <span style={{ fontWeight: 600 }}>Searching live sources (AllTrails, WTA, NPS) for current conditions...</span>
-                  </div>
-                  
-                  {[1, 2].map((i) => (
-                    <div 
-                      key={i} 
-                      className="pulse"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        borderRadius: '10px',
-                        padding: '0.85rem 1rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        height: '75px',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '85%' }}></div>
-                      <div style={{ height: '12px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', width: '60%' }}></div>
-                      <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', width: '30%', marginTop: '4px' }}></div>
-                    </div>
-                  ))}
                 </div>
               )}
 
@@ -488,7 +500,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                 }}
               >
                 <RefreshCw size={14} style={{ animation: tipsLoading ? 'spin 1s linear infinite' : 'none' }} />
-                <span>{tipsLoading ? 'Searching for live community reports...' : tipsFetched ? 'Check for newer live reports' : 'Fetch Live Community Reports'}</span>
+                <span>{tipsLoading ? 'Searching live sources for current conditions...' : tipsFetched ? 'Check for newer live reports' : 'Fetch Live Community Reports'}</span>
               </button>
             </div>
           )}

@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export default function Attribution({ groundingMetadata, isChat }) {
   if (!groundingMetadata) return null;
 
@@ -44,7 +46,7 @@ export default function Attribution({ groundingMetadata, isChat }) {
             borderBottom: hasMaps ? '1px solid var(--border-muted)' : 'none',
             paddingBottom: hasMaps ? '8px' : '0'
           }}
-          dangerouslySetInnerHTML={{ __html: searchEntryPoint.renderedContent }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(searchEntryPoint.renderedContent) }}
         />
       )}
 
