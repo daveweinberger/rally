@@ -628,7 +628,7 @@ export function MultiSelectActivityDropdown({ selectedActivities, onToggle, onAd
                 style={{
                   flex: 1,
                   padding: '0.5rem 0.75rem',
-                  fontSize: '0.85rem',
+                  fontSize: '16px',
                   fontFamily: 'var(--font-sans)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '8px',
@@ -725,7 +725,11 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false);
-  const [locationSource, setLocationSource] = useState(initialConstraints?.startCoords ? 'gps' : null);
+  const [locationSource, setLocationSource] = useState(
+    initialConstraints?.locationSource !== undefined 
+      ? initialConstraints.locationSource 
+      : (initialConstraints?.startCoords ? 'gps' : null)
+  );
   
   const locationRef = useRef(null);
 
@@ -974,6 +978,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
     onSubmit({
       startLocation,
       startCoords,
+      locationSource,
       timeWindow,
       targetDay,
       activities: selectedActivities,
@@ -1002,7 +1007,7 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
               id="location-input"
               type="text"
               className="glass-input"
-              style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+              style={{ paddingLeft: '2.5rem', paddingRight: startLocation ? '4.2rem' : '2.5rem' }}
               placeholder="Enter city, trailhead, or use GPS"
               value={startLocation}
               onChange={(e) => handleLocationChange(e.target.value)}
@@ -1012,6 +1017,34 @@ export default function InputPanel({ onSubmit, initialConstraints, autoFocusFiel
                 }
               }}
             />
+            {startLocation && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleLocationChange('');
+                  document.getElementById('location-input')?.focus();
+                }}
+                style={{
+                  position: 'absolute',
+                  right: '38px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                title="Clear location"
+                aria-label="Clear location"
+              >
+                <X size={14} />
+              </button>
+            )}
             <button
               type="button"
               onClick={requestGeolocation}

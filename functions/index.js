@@ -15,8 +15,8 @@ const INSTANCE_ID = Math.random().toString(36).substring(2, 10);
 let instanceRequestCount = 0;
 console.log(`[Lifecycle] Cloud Function instance ${INSTANCE_ID} initialized (Cold Start).`);
 
-// App Check should not be enforced when running locally in the Firebase Emulator
-const ENFORCE_APP_CHECK = process.env.FUNCTIONS_EMULATOR !== 'true';
+// Temporarily disable App Check enforcement until reCAPTCHA is fully configured for the production domain
+const ENFORCE_APP_CHECK = false;
 
 /**
  * Resolves routing data for an activity using placeId or coordinates, falling back to name+location if needed.

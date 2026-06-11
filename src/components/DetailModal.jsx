@@ -34,6 +34,36 @@ function isAttributionMatch(activityName, activityPlaceId, chunkMaps) {
   return cleanA.includes(cleanC) || cleanC.includes(cleanA);
 }
 
+const formatSource = (source, link) => {
+  if (!link) return source || 'Source';
+
+  if (link.includes('govdelivery.com')) {
+    const match = link.match(/\/accounts\/([^/]+)/i);
+    if (match && match[1]) {
+      const account = match[1].toUpperCase();
+      if (account === 'ORDOT' || account === 'ODOT') {
+        return 'Oregon Department of Transportation';
+      }
+      if (account === 'WSDOT' || account === 'WADOT') {
+        return 'Washington State Department of Transportation';
+      }
+      if (account === 'MNDOT') {
+        return 'Minnesota Department of Transportation';
+      }
+      if (account === 'USDAFS' || account === 'USFS') {
+        return 'U.S. Forest Service';
+      }
+      if (account === 'NPS') {
+        return 'National Park Service';
+      }
+      return `${account} (via GovDelivery)`;
+    }
+    return source || 'GovDelivery';
+  }
+
+  return source || 'Source';
+};
+
 export default function DetailModal({ activity, onClose, generalAttribution, onUpdateActivity }) {
   const [localItinerary, setLocalItinerary] = useState([]);
   const [localTips, setLocalTips] = useState([]);
@@ -227,7 +257,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
         </div>
 
         {/* Modal Body */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', overflowY: 'auto', paddingRight: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', overflowY: 'auto', paddingRight: '4px', paddingBottom: '8px' }}>
           
           {/* Match Reason */}
           <div className="flex-col gap-sm">
@@ -341,7 +371,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                           borderRadius: '6px',
                           color: 'var(--text-primary)',
                           fontFamily: 'var(--font-sans)',
-                          fontSize: '0.85rem',
+                          fontSize: '16px',
                           padding: '4px 6px',
                           outline: 'none',
                           cursor: 'pointer',
@@ -378,8 +408,9 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                   {localTips.map((tip, idx) => {
                     const tipText = typeof tip === 'object' ? tip.text : tip;
                     const tipDate = typeof tip === 'object' ? tip.date : null;
-                    const tipSource = typeof tip === 'object' ? tip.source : null;
+                    const rawSource = typeof tip === 'object' ? tip.source : null;
                     const tipLink = typeof tip === 'object' ? tip.link : null;
+                    const tipSource = formatSource(rawSource, tipLink);
 
                     const isVerbatim = typeof tip === 'object' && tip.isVerbatim === true;
 
@@ -413,7 +444,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                           </p>
                         )}
                         {(tipSource || tipDate) && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
                             {tipSource && (
                               <>
                                 {tipLink ? (
@@ -425,22 +456,20 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                                       color: 'var(--accent-moss)', 
                                       textDecoration: 'none', 
                                       fontWeight: 600,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
+                                      display: 'inline'
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
                                     onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
                                   >
-                                    <span>{tipSource}</span>
-                                    <ExternalLink size={10} style={{ opacity: 0.8 }} />
+                                    {tipSource}
+                                    <ExternalLink size={10} style={{ display: 'inline-block', marginLeft: '3px', verticalAlign: 'middle', opacity: 0.8, marginBottom: '2px' }} />
                                   </a>
                                 ) : (
                                   <span style={{ fontWeight: 600 }}>{tipSource}</span>
                                 )}
                               </>
                             )}
-                            {tipSource && tipDate && <span>•</span>}
+                            {tipSource && tipDate && <span> • </span>}
                             {tipDate && <span>{tipDate}</span>}
                           </div>
                         )}
@@ -500,7 +529,7 @@ export default function DetailModal({ activity, onClose, generalAttribution, onU
                 }}
               >
                 <RefreshCw size={14} style={{ animation: tipsLoading ? 'spin 1s linear infinite' : 'none' }} />
-                <span>{tipsLoading ? 'Searching live sources for current conditions...' : tipsFetched ? 'Check for newer live reports' : 'Fetch Live Community Reports'}</span>
+                <span>{tipsLoading ? 'Searching live sources...' : tipsFetched ? 'Check for newer live reports' : 'Fetch Live Community Reports'}</span>
               </button>
             </div>
           )}

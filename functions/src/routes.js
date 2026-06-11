@@ -83,7 +83,7 @@ export async function computeRoute(originInput, destinationInput, fallbackCoords
   // Create a safe cache key
   const combined = `${originStr}_to_${destinationStr}`;
   // Base64 encode and clean it to be a valid firestore doc ID
-  const cacheKey = 'route_' + Buffer.from(combined).toString('base64').replace(/[^a-zA-Z0-9-_]/g, '');
+  const cacheKey = 'route_imp_' + Buffer.from(combined).toString('base64').replace(/[^a-zA-Z0-9-_]/g, '');
 
   // Check cache (TTL 15 minutes)
   const cached = await getCache(cacheKey);
@@ -112,7 +112,9 @@ export async function computeRoute(originInput, destinationInput, fallbackCoords
     destination: getWaypoint(destinationInput),
     travelMode: 'DRIVE',
     routingPreference: 'TRAFFIC_AWARE',
-    computeAlternativeRoutes: false
+    computeAlternativeRoutes: false,
+    languageCode: 'en-US',
+    units: 'IMPERIAL'
   };
 
   try {
